@@ -1,0 +1,35 @@
+fastapi==0.115.0
+uvicorn[standard]==0.31.0
+pydantic==2.9.2
+pydantic[email]==2.9.2
+sqlalchemy==2.0.35
+python-dotenv==1.0.1
+pyjwt==2.9.0
+
+# Base de datos
+psycopg[binary]==3.2.3
+pgvector==0.3.5
+
+# Cola de trabajos y planificación
+redis==5.1.1
+rq==2.0.0
+apscheduler==3.10.4
+
+# OneDrive / Microsoft Graph
+httpx==0.27.2
+msal==1.31.0
+
+# Procesamiento de documentos
+pypdf==5.0.1
+pdfplumber==0.11.4
+python-docx==1.1.2
+pytesseract==0.3.13
+pdf2image==1.17.0
+
+# Exportación
+openpyxl==3.1.5
+weasyprint==62.3
+
+# Pruebas
+pytest==8.3.3
+httpx==0.27.2
