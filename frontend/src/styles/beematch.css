@@ -244,3 +244,5 @@
 .bm-alert { border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
 .bm-alert-error { background: var(--red-bg); color: #A82020; border: 1px solid #F3C6C6; }
 .bm-alert-info { background: var(--yellow-soft); border: 1px solid var(--yellow-line); }
+
+.bm-alert-ok { background: var(--green-bg); color: var(--green-tx); border: 1px solid #B8E6C8; }

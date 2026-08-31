@@ -8,6 +8,7 @@ from backend.infrastructure.persistence.models.busqueda import (  # noqa: F401
 )
 from backend.infrastructure.persistence.models.cliente import ClienteModel, ProyectoModel  # noqa: F401
 from backend.infrastructure.persistence.models.configuracion import (  # noqa: F401
+    ConfiguracionOneDriveModel,
     ParametroRecomendacionModel,
     RegistroBitacoraModel,
 )
