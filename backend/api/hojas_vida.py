@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_SINCRONIZACION, BitacoraService
@@ -10,6 +10,7 @@ from backend.infrastructure.persistence.models.hoja_vida import (
 )
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.schemas.hoja_vida import EstadoIndiceResponse, SincronizacionResponse
+from backend.domain.services.onedrive_config_service import OneDriveNoConfiguradoError
 from backend.security import ROL_ADMINISTRADOR, exigir_rol, get_current_user
 from backend.workers.scheduler import sincronizar_y_encolar
 
@@ -36,8 +37,14 @@ def sincronizar(
     db: Session = Depends(get_db),
     current_user=Depends(exigir_rol(ROL_ADMINISTRADOR)),
 ):
-    """HU-05, HU-16: sincronización bajo demanda con OneDrive."""
-    resultado = sincronizar_y_encolar()
+    """HU-05, HU-16: sincronización bajo demanda contra la carpeta configurada."""
+    try:
+        resultado = sincronizar_y_encolar()
+    except OneDriveNoConfiguradoError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001
+        # HU-26: el error se explica, no se traga.
+        raise HTTPException(status_code=502, detail=f"No fue posible sincronizar: {exc}")
     BitacoraService(db).registrar(ACCION_SINCRONIZACION, usuario_id=current_user.id)
     return SincronizacionResponse(
         documentos_detectados=resultado["documentos_detectados"],

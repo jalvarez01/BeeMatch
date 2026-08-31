@@ -1,32 +1,38 @@
 """
 Sincronización con OneDrive (componente C7).
 
-RF01: no duplica ni migra información. Solo registra la referencia del documento
-y encola para indexación lo que cambió (RD5).
+RF01: no duplica ni migra información. Registra la referencia del documento y
+encola para indexación solo lo que cambió (RD5).
+
+El origen es siempre la ruta que el administrador configuró (HU-05), no una
+variable de entorno.
 """
 
 from sqlalchemy.orm import Session
 
-from backend.infrastructure.onedrive.graph_client import GraphClient, OneDriveError
-from backend.infrastructure.persistence.repositories.configuracion_repo import ParametroRepository
+from backend.domain.services.onedrive_config_service import OneDriveConfigService
+from backend.infrastructure.persistence.repositories.configuracion_repo import (
+    OneDriveConfigRepository,
+)
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
-
-CLAVE_DELTA = "onedrive_delta_link"
 
 
 class SincronizacionService:
     def __init__(self, db: Session):
         self.db = db
         self.repo = HojaDeVidaRepository(db)
-        self.parametros = ParametroRepository(db)
-        self.cliente = GraphClient()
+        self.config_repo = OneDriveConfigRepository(db)
+        self.config_service = OneDriveConfigService(db)
 
     def sincronizar(self) -> dict:
-        """Detecta cambios y devuelve los ids de hojas de vida a reindexar."""
-        parametro = self.parametros.get(CLAVE_DELTA)
-        delta_previo = parametro.valor if parametro else None
+        """
+        Detecta cambios en la carpeta configurada y devuelve los ids de hojas de
+        vida que deben reindexarse.
+        """
+        config = self.config_repo.get_activa()
+        cliente = self.config_service.cliente_activo()
 
-        documentos, nuevo_delta = self.cliente.listar_documentos(delta_previo)
+        documentos, nuevo_delta = cliente.listar_documentos(config.delta_link if config else None)
 
         a_indexar: list[str] = []
         for documento in documentos:
@@ -45,7 +51,7 @@ class SincronizacionService:
                 a_indexar.append(hoja.id)
 
         if nuevo_delta:
-            self.parametros.establecer(CLAVE_DELTA, nuevo_delta)
+            self.config_repo.actualizar_delta(nuevo_delta)
 
         return {
             "documentos_detectados": len(documentos),

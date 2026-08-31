@@ -23,6 +23,9 @@ USA_PGVECTOR = DATABASE_URL.startswith("postgresql")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # --- Microsoft Graph / OneDrive (RNF11: solo lectura) ------------------------
+# La configuración vive en base de datos y la administra el usuario desde la
+# aplicación (HU-05). Estos valores solo se usan como semilla inicial cuando la
+# tabla está vacía, útil para levantar un entorno automatizado.
 MS_TENANT_ID = os.getenv("MS_TENANT_ID", "")
 MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "")
 MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "")
@@ -46,6 +49,10 @@ CHUNK_SOLAPAMIENTO = int(os.getenv("CHUNK_SOLAPAMIENTO", "200"))
 
 # --- Seguridad ---------------------------------------------------------------
 JWT_SECRET = os.getenv("JWT_SECRET", "beematch-dev-secret-cambiar-en-produccion")
+
+# Clave de cifrado de secretos en base de datos (client secret de Graph).
+# Debe ser una clave Fernet válida. Si se omite, se deriva del JWT_SECRET.
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRACION_HORAS = int(os.getenv("JWT_EXPIRACION_HORAS", "8"))
 
