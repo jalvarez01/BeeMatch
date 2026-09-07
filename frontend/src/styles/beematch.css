@@ -89,12 +89,23 @@
 
 /* ---------- botones ---------- */
 .bm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: background .15s, border-color .15s; }
-.bm-btn-primary { background: var(--yellow); color: var(--ink); font-weight: 600; }
-.bm-btn-primary:hover { background: var(--yellow-hover); }
-.bm-btn-dark { background: var(--ink); color: #fff; }
-.bm-btn-dark:hover { background: #333338; }
-.bm-btn-ghost { background: var(--white); border: 1px solid var(--line); }
-.bm-btn-ghost:hover { border-color: #C9CDD4; }
+/* Las variantes van prefijadas con `.bm` a propósito: el reset `.bm button`
+   de más arriba tiene mayor especificidad que una sola clase y, sin el
+   prefijo, dejaba el fondo transparente hasta que el mouse pasaba encima. */
+
+/* Acción principal: fondo amarillo fijo, visible siempre. */
+.bm .bm-btn-primary { background: #E9B92C; color: var(--ink); font-weight: 600; }
+.bm .bm-btn-primary:hover { background: #E9B92C; }
+
+/* Acción secundaria: mismo gris del botón "Configuración" de la barra lateral. */
+.bm .bm-btn-soft { background: #F4F4F5; color: var(--ink-soft); }
+.bm .bm-btn-soft:hover { background: #F4F4F5; }
+
+.bm .bm-btn-dark { background: var(--ink); color: #fff; }
+.bm .bm-btn-dark:hover { background: #333338; }
+
+.bm .bm-btn-ghost { background: var(--white); border: 1px solid var(--line); }
+.bm .bm-btn-ghost:hover { border-color: #C9CDD4; }
 .bm-btn-link { color: var(--muted); font-size: 13px; }
 .bm-btn-link:hover { color: var(--ink); }
 .bm-btn-back { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; margin-bottom: 18px; }

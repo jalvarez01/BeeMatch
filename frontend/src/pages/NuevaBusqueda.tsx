@@ -196,7 +196,7 @@ export default function NuevaBusqueda() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button className="bm-btn bm-btn-ghost" onClick={guardarBorrador}>
+        <button className="bm-btn bm-btn-soft" onClick={guardarBorrador}>
           Guardar borrador
         </button>
         <button className="bm-btn bm-btn-primary" onClick={buscar} disabled={enviando}>

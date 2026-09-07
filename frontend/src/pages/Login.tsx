@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { iniciarSesion } from '../api/auth'
 import { IconEye } from '../components/Icons'
 
-/** HU-01: inicio de sesión con credenciales corporativas. */
+/** HU-01: inicio de sesión con credenciales corporativas. */
 export default function Login() {
   const navegar = useNavigate()
   const ubicacion = useLocation()
@@ -24,8 +24,8 @@ export default function Login() {
       await iniciarSesion(correo, password)
       navegar(destino, { replace: true })
     } catch (excepcion) {
-      // HU-01-CP2: no se indica cuál de los dos datos falló.
-      setError('Usuario o contraseña incorrectos')
+      // HU-01-CP2: no se indica cuál de los dos datos falló.
+      setError('Usuario o contraseña incorrectos')
       void excepcion
     } finally {
       setCargando(false)
@@ -50,7 +50,7 @@ export default function Login() {
             con mayor afinidad.
           </p>
 
-          <svg viewBox="0 0 320 260" style={{ marginTop: 'auto', width: '100%' }} aria-hidden>
+          <svg viewBox="0 0 320 278" style={{ marginTop: 'auto', width: '100%' }} aria-hidden>
             <g fill="none" stroke="#F5C842" strokeWidth="1.2">
               <polygon points="45,120 75,103 105,120 105,155 75,172 45,155" />
               <polygon points="120,80 150,63 180,80 180,115 150,132 120,115" />
@@ -59,16 +59,19 @@ export default function Login() {
             <g fill="#E8E8EA" fontSize="8" textAnchor="middle">
               <text x="75" y="135">Recomendaciones</text>
               <text x="75" y="145">inteligentes</text>
-              <text x="150" y="95">Análisis de hojas</text>
+              <text x="150" y="95">Análisis de hojas</text>
               <text x="150" y="105">de vida</text>
-              <text x="115" y="195">Staffing ágil</text>
+              <text x="115" y="195">Staffing ágil</text>
               <text x="115" y="205">y preciso</text>
             </g>
-            <path d="M20 235 Q120 235 200 195 T300 120" fill="none" stroke="#6E6E73" strokeWidth="1.2" />
-            <circle cx="20" cy="235" r="4" fill="#D9D9DC" />
-            <circle cx="110" cy="228" r="4" fill="#D9D9DC" />
-            <circle cx="205" cy="192" r="4" fill="#F5C842" />
-            <circle cx="300" cy="120" r="4" fill="#D9D9DC" />
+            {/* La curva pasa por debajo del hexágono inferior: no debe cruzarlo. */}
+            <path d="M15 258 Q115 262 205 204 T305 118" fill="none" stroke="#6E6E73" strokeWidth="1.2" />
+            {/* Los cuatro puntos caen exactamente sobre la curva:
+                inicio, punto medio del primer tramo, unión de tramos y final. */}
+            <circle cx="15" cy="258" r="4" fill="#D9D9DC" />
+            <circle cx="112.5" cy="246.5" r="4" fill="#D9D9DC" />
+            <circle cx="205" cy="204" r="4" fill="#F5C842" />
+            <circle cx="305" cy="118" r="4" fill="#D9D9DC" />
           </svg>
         </section>
 
@@ -91,7 +94,7 @@ export default function Login() {
               required
             />
 
-            <label htmlFor="password">Contraseña</label>
+            <label htmlFor="password">Contraseña</label>
             <div className="bm-input-wrap">
               <input
                 id="password"
@@ -106,7 +109,7 @@ export default function Login() {
                 type="button"
                 className="bm-eye"
                 onClick={() => setVerClave(!verClave)}
-                aria-label="Mostrar contraseña"
+                aria-label="Mostrar contraseña"
               >
                 <IconEye />
               </button>
@@ -115,11 +118,11 @@ export default function Login() {
             {error && <p className="bm-error">{error}</p>}
 
             <button type="submit" className="bm-btn bm-btn-primary" disabled={cargando}>
-              {cargando ? 'Ingresando…' : 'Iniciar sesión'}
+              {cargando ? 'Ingresando…' : 'Iniciar sesión'}
             </button>
             <p className="foot">Acceso exclusivo para personal autorizado de BEE.</p>
           </form>
-          <span className="copy">© 2026 BEE Consultoría y Negocios</span>
+          <span className="copy">© 2026 BEE Consultoría y Negocios</span>
         </section>
       </div>
     </div>
