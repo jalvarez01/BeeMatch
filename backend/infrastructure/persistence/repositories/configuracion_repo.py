@@ -5,83 +5,81 @@ from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models._base import utcnow
 from backend.infrastructure.persistence.models.configuracion import (
-    ConfiguracionOneDriveModel,
+    ConfiguracionRepositorioModel,
     ParametroRecomendacionModel,
     RegistroBitacoraModel,
 )
 
 
-class OneDriveConfigRepository:
+class RepositorioConfigRepository:
     """
-    Acceso a la configuración de conexión con OneDrive (HU-05).
+    Acceso a la configuración del origen de hojas de vida (HU-05).
 
-    Solo se mantiene un registro activo. Las escrituras son atómicas: o se
-    guarda la configuración completa, o no se toca la anterior.
+    Solo se mantiene un registro activo, sea cual sea el proveedor. Las
+    escrituras son atómicas: o se guarda la configuración completa, o no se
+    toca la anterior.
     """
 
     def __init__(self, db: Session):
         self.db = db
 
-    def get_activa(self) -> Optional[ConfiguracionOneDriveModel]:
+    def get_activa(self) -> Optional[ConfiguracionRepositorioModel]:
         return (
-            self.db.query(ConfiguracionOneDriveModel)
-            .filter(ConfiguracionOneDriveModel.activa.is_(True))
-            .order_by(ConfiguracionOneDriveModel.updated_at.desc())
+            self.db.query(ConfiguracionRepositorioModel)
+            .filter(ConfiguracionRepositorioModel.activa.is_(True))
+            .order_by(ConfiguracionRepositorioModel.updated_at.desc())
             .first()
         )
 
     def guardar(
         self,
-        tenant_id: str,
-        client_id: str,
-        client_secret_cifrado: str,
-        drive_id: str,
-        carpeta_cv: str,
+        tipo: str,
+        carpeta: str,
+        credenciales_cifradas: str,
         usuario_id: Optional[str] = None,
         documentos_detectados: Optional[int] = None,
-    ) -> ConfiguracionOneDriveModel:
+        reiniciar_cursor: bool = False,
+    ) -> ConfiguracionRepositorioModel:
         """
         Crea o actualiza la configuración activa.
 
         Se llama solo después de que la conexión fue validada, de modo que una
         credencial inválida nunca sobrescribe la configuración anterior.
+
+        `reiniciar_cursor` lo decide el servicio: si cambió el origen (el
+        proveedor o la carpeta), el cursor anterior ya no aplica y la próxima
+        sincronización debe recorrer todo de nuevo.
         """
         config = self.get_activa()
 
         if config is None:
-            config = ConfiguracionOneDriveModel(
-                tenant_id=tenant_id,
-                client_id=client_id,
-                client_secret_cifrado=client_secret_cifrado,
-                drive_id=drive_id,
-                carpeta_cv=carpeta_cv,
+            config = ConfiguracionRepositorioModel(
+                tipo=tipo,
+                carpeta=carpeta,
+                credenciales_cifradas=credenciales_cifradas,
                 actualizado_por=usuario_id,
                 ultima_validacion=utcnow(),
                 documentos_detectados=documentos_detectados,
             )
             self.db.add(config)
         else:
-            cambio_origen = config.drive_id != drive_id or config.carpeta_cv != carpeta_cv
+            cambio_origen = reiniciar_cursor or config.tipo != tipo or config.carpeta != carpeta
 
-            config.tenant_id = tenant_id
-            config.client_id = client_id
-            config.client_secret_cifrado = client_secret_cifrado
-            config.drive_id = drive_id
-            config.carpeta_cv = carpeta_cv
+            config.tipo = tipo
+            config.carpeta = carpeta
+            config.credenciales_cifradas = credenciales_cifradas
             config.actualizado_por = usuario_id
             config.ultima_validacion = utcnow()
             config.documentos_detectados = documentos_detectados
 
-            # Si cambió la carpeta o el drive, el token delta anterior ya no
-            # aplica: la próxima sincronización debe recorrer todo de nuevo.
             if cambio_origen:
-                config.delta_link = None
+                config.cursor_sincronizacion = None
 
         self.db.commit()
         self.db.refresh(config)
         return config
 
-    def registrar_validacion(self, documentos_detectados: int) -> Optional[ConfiguracionOneDriveModel]:
+    def registrar_validacion(self, documentos_detectados: int) -> Optional[ConfiguracionRepositorioModel]:
         config = self.get_activa()
         if not config:
             return None
@@ -91,10 +89,10 @@ class OneDriveConfigRepository:
         self.db.refresh(config)
         return config
 
-    def actualizar_delta(self, delta_link: Optional[str]) -> None:
+    def actualizar_cursor(self, cursor: Optional[str]) -> None:
         config = self.get_activa()
         if config:
-            config.delta_link = delta_link
+            config.cursor_sincronizacion = cursor
             self.db.commit()
 
     def desactivar(self) -> None:

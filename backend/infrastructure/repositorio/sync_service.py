@@ -1,18 +1,19 @@
 """
-Sincronización con OneDrive (componente C7).
+Sincronización con el repositorio configurado (componente C7).
 
 RF01: no duplica ni migra información. Registra la referencia del documento y
 encola para indexación solo lo que cambió (RD5).
 
-El origen es siempre la ruta que el administrador configuró (HU-05), no una
-variable de entorno.
+El origen es siempre el que el administrador configuró (HU-05) —OneDrive o
+Google Drive—, no una variable de entorno. Este servicio trabaja contra la
+interfaz RepositorioDocumentos y no conoce al proveedor.
 """
 
 from sqlalchemy.orm import Session
 
-from backend.domain.services.onedrive_config_service import OneDriveConfigService
+from backend.domain.services.repositorio_config_service import RepositorioConfigService
 from backend.infrastructure.persistence.repositories.configuracion_repo import (
-    OneDriveConfigRepository,
+    RepositorioConfigRepository,
 )
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 
@@ -21,8 +22,8 @@ class SincronizacionService:
     def __init__(self, db: Session):
         self.db = db
         self.repo = HojaDeVidaRepository(db)
-        self.config_repo = OneDriveConfigRepository(db)
-        self.config_service = OneDriveConfigService(db)
+        self.config_repo = RepositorioConfigRepository(db)
+        self.config_service = RepositorioConfigService(db)
 
     def sincronizar(self) -> dict:
         """
@@ -32,13 +33,14 @@ class SincronizacionService:
         config = self.config_repo.get_activa()
         cliente = self.config_service.cliente_activo()
 
-        documentos, nuevo_delta = cliente.listar_documentos(config.delta_link if config else None)
+        cursor_previo = config.cursor_sincronizacion if config else None
+        documentos, nuevo_cursor = cliente.listar_documentos(cursor_previo)
 
         a_indexar: list[str] = []
         for documento in documentos:
             hoja, necesita_reindexar = self.repo.registrar_o_actualizar(
                 {
-                    "id_onedrive": documento.id_onedrive,
+                    "id_documento": documento.id_documento,
                     "nombre_archivo": documento.nombre_archivo,
                     "ruta": documento.ruta,
                     "url_web": documento.url_web,
@@ -50,8 +52,10 @@ class SincronizacionService:
             if necesita_reindexar:
                 a_indexar.append(hoja.id)
 
-        if nuevo_delta:
-            self.config_repo.actualizar_delta(nuevo_delta)
+        # Los orígenes sin delta (Google Drive) devuelven None: se conserva el
+        # cursor anterior en lugar de borrarlo.
+        if nuevo_cursor:
+            self.config_repo.actualizar_cursor(nuevo_cursor)
 
         return {
             "documentos_detectados": len(documentos),

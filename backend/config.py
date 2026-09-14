@@ -22,10 +22,11 @@ USA_PGVECTOR = DATABASE_URL.startswith("postgresql")
 # --- Cola de trabajos (RNF04) ------------------------------------------------
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# --- Microsoft Graph / OneDrive (RNF11: solo lectura) ------------------------
-# La configuración vive en base de datos y la administra el usuario desde la
-# aplicación (HU-05). Estos valores solo se usan como semilla inicial cuando la
-# tabla está vacía, útil para levantar un entorno automatizado.
+# --- Repositorio de hojas de vida (RNF11: solo lectura) ----------------------
+# El origen (OneDrive o Google Drive) y sus credenciales viven en base de datos
+# y los administra el usuario desde la aplicación (HU-05). Los valores de abajo
+# solo se usan como semilla inicial cuando la tabla está vacía, útil para
+# levantar un entorno automatizado.
 MS_TENANT_ID = os.getenv("MS_TENANT_ID", "")
 MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "")
 MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "")

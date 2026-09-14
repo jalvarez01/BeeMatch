@@ -43,14 +43,30 @@ def on_startup():
     init_db()
     _sembrar_parametros()
 
-    # El planificador solo arranca si APScheduler está instalado y hay
-    # credenciales de Graph configuradas.
-    from backend.config import MS_CLIENT_ID
-
-    if MS_CLIENT_ID:
+    # El planificador solo arranca si APScheduler está instalado y hay un
+    # origen de hojas de vida configurado, sea cual sea el proveedor.
+    if _hay_origen_configurado():
         from backend.workers.scheduler import iniciar_planificador
 
         iniciar_planificador()
+
+
+def _hay_origen_configurado() -> bool:
+    """Configuración registrada desde la aplicación (HU-05), o semilla de entorno."""
+    from backend.config import MS_CLIENT_ID
+    from backend.infrastructure.persistence.database import SessionLocal
+    from backend.infrastructure.persistence.repositories.configuracion_repo import (
+        RepositorioConfigRepository,
+    )
+
+    db = SessionLocal()
+    try:
+        if RepositorioConfigRepository(db).get_activa():
+            return True
+    finally:
+        db.close()
+
+    return bool(MS_CLIENT_ID)
 
 
 def _sembrar_parametros():

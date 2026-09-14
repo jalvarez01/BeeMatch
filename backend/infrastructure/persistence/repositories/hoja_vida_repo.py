@@ -22,19 +22,19 @@ class HojaDeVidaRepository:
     def get_by_id(self, hoja_id: str) -> Optional[HojaDeVidaModel]:
         return self.db.get(HojaDeVidaModel, hoja_id)
 
-    def get_by_onedrive_id(self, id_onedrive: str) -> Optional[HojaDeVidaModel]:
+    def get_by_id_documento(self, id_documento: str) -> Optional[HojaDeVidaModel]:
         return (
             self.db.query(HojaDeVidaModel)
-            .filter(HojaDeVidaModel.id_onedrive == id_onedrive)
+            .filter(HojaDeVidaModel.id_documento == id_documento)
             .first()
         )
 
     def registrar_o_actualizar(self, datos: dict) -> tuple[HojaDeVidaModel, bool]:
         """
-        Alta o actualización desde la sincronización con OneDrive.
+        Alta o actualización desde la sincronización con el repositorio.
         Retorna (hoja, necesita_reindexar). RD5: solo se reindexa si cambió.
         """
-        existente = self.get_by_onedrive_id(datos["id_onedrive"])
+        existente = self.get_by_id_documento(datos["id_documento"])
         if not existente:
             hoja = HojaDeVidaModel(**datos)
             self.db.add(hoja)

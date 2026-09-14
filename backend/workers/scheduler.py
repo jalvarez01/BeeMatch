@@ -1,10 +1,11 @@
 """
-Planificador (componente C18): dispara la sincronización con OneDrive cada
-SYNC_INTERVALO_HORAS. También puede lanzarse bajo demanda desde la interfaz.
+Planificador (componente C18): dispara la sincronización con el repositorio
+configurado cada SYNC_INTERVALO_HORAS. También puede lanzarse bajo demanda
+desde la interfaz.
 """
 
 from backend.config import SYNC_INTERVALO_HORAS
-from backend.infrastructure.onedrive.sync_service import SincronizacionService
+from backend.infrastructure.repositorio.sync_service import SincronizacionService
 from backend.infrastructure.persistence.database import SessionLocal
 from backend.workers.ingesta_worker import indexar_hoja_de_vida
 from backend.workers.queue import encolar
