@@ -14,7 +14,10 @@ from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
 from backend.domain.matching.scorer import supera_umbral
-from backend.infrastructure.llm.embeddings import ProveedorEmbeddings
+from backend.infrastructure.llm.embeddings import (
+    ProveedorEmbeddings,
+    ProveedorEmbeddingsNoDisponibleError,
+)
 from backend.infrastructure.llm.llm_provider import ServicioIAError
 from backend.infrastructure.persistence.models.busqueda import (
     BUSQUEDA_COMPLETADA,
@@ -115,6 +118,11 @@ class BusquedaService:
             )
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_PROCESADA)
 
+        except ProveedorEmbeddingsNoDisponibleError as exc:
+            # Mismo trato que un fallo del LLM: es una pieza del sistema que
+            # falta, y el motivo se dice tal cual en vez de "error inesperado".
+            self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=str(exc))
+            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
         except ServicioIAError as exc:
             # HU-26: el error se informa con claridad y la solicitud no se pierde.
             self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=str(exc))

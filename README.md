@@ -137,12 +137,15 @@ Los permisos sobre OneDrive deben ser **solo lectura** y limitados a la carpeta 
 
 ## Pendiente de implementar
 
-Tres puntos están marcados con `TODO` y son el trabajo del Sprint 1:
+Queda un `TODO` del Sprint 1:
 
-- `infrastructure/llm/embeddings.py` → llamada real al proveedor de embeddings.
-- `infrastructure/llm/llm_provider.py` → llamada real al modelo de lenguaje.
 - `domain/services/indexacion_service.py` → extracción del perfil estructurado con IA (hoy es una
   heurística sobre el nombre del archivo).
+
+Los proveedores de IA ya están conectados y necesitan dos claves en `.env`: `LLM_API_KEY` (Anthropic, para el
+re-ranking y la explicación de resultados) y `EMBEDDING_API_KEY` (OpenAI, para vectorizar hojas de vida y
+consultas). Son proveedores distintos porque Anthropic no ofrece API de embeddings. Sin ellas la aplicación
+arranca igual: la sincronización registra los documentos y deja la indexación aplazada.
 
 La exportación a PDF (`domain/services/export_service.py`) está prevista para el Sprint 3; la
 exportación a XLSX ya funciona.
