@@ -22,10 +22,11 @@ USA_PGVECTOR = DATABASE_URL.startswith("postgresql")
 # --- Cola de trabajos (RNF04) ------------------------------------------------
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# --- Microsoft Graph / OneDrive (RNF11: solo lectura) ------------------------
-# La configuración vive en base de datos y la administra el usuario desde la
-# aplicación (HU-05). Estos valores solo se usan como semilla inicial cuando la
-# tabla está vacía, útil para levantar un entorno automatizado.
+# --- Repositorio de hojas de vida (RNF11: solo lectura) ----------------------
+# El origen (OneDrive o Google Drive) y sus credenciales viven en base de datos
+# y los administra el usuario desde la aplicación (HU-05). Los valores de abajo
+# solo se usan como semilla inicial cuando la tabla está vacía, útil para
+# levantar un entorno automatizado.
 MS_TENANT_ID = os.getenv("MS_TENANT_ID", "")
 MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "")
 MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "")
@@ -33,6 +34,15 @@ ONEDRIVE_DRIVE_ID = os.getenv("ONEDRIVE_DRIVE_ID", "")
 ONEDRIVE_CARPETA_CV = os.getenv("ONEDRIVE_CARPETA_CV", "/HojasDeVida")
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 SYNC_INTERVALO_HORAS = int(os.getenv("SYNC_INTERVALO_HORAS", "6"))
+
+# Semilla de Google Drive: archivo de la cuenta de servicio en la raíz del
+# proyecto y carpeta de hojas de vida compartida con esa cuenta. Sirve para que
+# el equipo no tenga que registrar la conexión a mano en cada máquina. El
+# archivo está en .gitignore y nunca se versiona (RNF10).
+GDRIVE_ARCHIVO_CREDENCIALES = Path(
+    os.getenv("GDRIVE_ARCHIVO_CREDENCIALES", str(BASE_DIR / "beematch-credenciales.json"))
+)
+GDRIVE_CARPETA_ID = os.getenv("GDRIVE_CARPETA_ID", "1H7-p-d3auJOzrw660zGfmKa5drW0Hn_V")
 
 # --- Servicio de IA (RNF33: configurable sin recompilar) ---------------------
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")

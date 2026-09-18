@@ -8,27 +8,36 @@ from backend.infrastructure.persistence.database import Base
 from backend.infrastructure.persistence.models._base import nuevo_id, utcnow
 
 
-class ConfiguracionOneDriveModel(Base):
+class ConfiguracionRepositorioModel(Base):
     """
-    Conexión al repositorio corporativo de hojas de vida (HU-05).
+    Conexión al repositorio de hojas de vida (HU-05).
 
-    Solo existe un registro activo a la vez. El client secret se guarda cifrado
-    (RNF10) y nunca se devuelve en claro por la API: la interfaz solo recibe una
-    versión enmascarada.
+    Reemplaza a la antigua `configuracion_onedrive`: el origen dejó de ser
+    forzosamente OneDrive, así que los datos propios de cada proveedor viven en
+    un JSON cifrado (RNF10) en lugar de columnas sueltas. Lo común —el tipo, la
+    carpeta, el cursor y el resultado de la última validación— sí son columnas.
+
+    Solo existe un registro activo a la vez. Las credenciales nunca se
+    devuelven en claro por la API: la interfaz recibe una versión enmascarada.
 
     La ruta configurada aquí es el origen que usan la sincronización y, por
     consiguiente, todas las búsquedas de los usuarios.
     """
 
-    __tablename__ = "configuracion_onedrive"
+    __tablename__ = "configuracion_repositorio"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=nuevo_id)
 
-    tenant_id: Mapped[str] = mapped_column(String(100))
-    client_id: Mapped[str] = mapped_column(String(100))
-    client_secret_cifrado: Mapped[str] = mapped_column(Text)
-    drive_id: Mapped[str] = mapped_column(String(200))
-    carpeta_cv: Mapped[str] = mapped_column(String(400), default="/HojasDeVida")
+    # ONEDRIVE | GDRIVE (ver backend.infrastructure.repositorio.base).
+    tipo: Mapped[str] = mapped_column(String(20), default="ONEDRIVE")
+
+    # Carpeta de hojas de vida: ruta en OneDrive, folder id en Google Drive.
+    carpeta: Mapped[str] = mapped_column(String(400), default="")
+
+    # JSON cifrado con los datos propios del proveedor. OneDrive guarda aquí
+    # tenant_id, client_id, client_secret y drive_id; Google Drive, el JSON de
+    # la cuenta de servicio.
+    credenciales_cifradas: Mapped[str] = mapped_column(Text)
 
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -36,8 +45,9 @@ class ConfiguracionOneDriveModel(Base):
     ultima_validacion: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     documentos_detectados: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    # Token delta de Microsoft Graph: permite sincronizar solo lo que cambió (RD5).
-    delta_link: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Cursor opaco para sincronizar solo lo que cambió (RD5): delta link en
+    # Microsoft Graph. Google Drive no ofrece delta por carpeta y lo deja nulo.
+    cursor_sincronizacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     actualizado_por: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -9,53 +9,33 @@ el administrador registró en la aplicación (HU-05), no de variables de entorno
 Eso permite validar una configuración nueva sin tocar la que está en uso.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
 import httpx
 
 from backend.config import GRAPH_SCOPES
+from backend.infrastructure.repositorio.base import (
+    CredencialesInvalidasError,
+    DocumentoRepositorio,
+    RepositorioDocumentos,
+    RepositorioError,
+    RepositorioNoEncontradoError,
+    ResultadoPrueba,
+    SinPermisoLecturaError,
+)
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 EXTENSIONES_VALIDAS = (".pdf", ".docx", ".doc")
 
-
-class OneDriveError(Exception):
-    """Fallo de conexión con el repositorio (HU-26, RNF18)."""
-
-
-class CredencialesInvalidasError(OneDriveError):
-    """El tenant, el client id o el secret fueron rechazados por Entra ID."""
+# Los errores y los tipos de datos ahora son compartidos con los demás
+# orígenes. Se reexportan con el nombre anterior para no romper a quien los
+# importa desde aquí.
+OneDriveError = RepositorioError
+DocumentoOneDrive = DocumentoRepositorio
 
 
-class RepositorioNoEncontradoError(OneDriveError):
-    """El drive existe pero la carpeta configurada no."""
-
-
-@dataclass
-class DocumentoOneDrive:
-    id_onedrive: str
-    nombre_archivo: str
-    ruta: str
-    url_web: Optional[str]
-    formato: str
-    hash_contenido: Optional[str]
-    fecha_modificacion: Optional[datetime]
-    tamanio: int
-
-
-@dataclass
-class ResultadoPrueba:
-    """Respuesta de "Probar conexión" (HU-05)."""
-
-    exito: bool
-    documentos_detectados: int = 0
-    mensaje: str = ""
-    detalle: Optional[str] = None
-
-
-class GraphClient:
+class GraphClient(RepositorioDocumentos):
     def __init__(
         self,
         tenant_id: str,
@@ -72,14 +52,17 @@ class GraphClient:
         self._token: Optional[str] = None
 
     @classmethod
-    def desde_configuracion(cls, config, client_secret: str) -> "GraphClient":
-        """Construye el cliente a partir del registro de configuración activo."""
+    def desde_credenciales(cls, credenciales: dict, carpeta: str) -> "GraphClient":
+        """
+        Construye el cliente desde el JSON de credenciales descifrado de la
+        configuración activa. Lo usa la factory de orígenes.
+        """
         return cls(
-            tenant_id=config.tenant_id,
-            client_id=config.client_id,
-            client_secret=client_secret,
-            drive_id=config.drive_id,
-            carpeta_cv=config.carpeta_cv,
+            tenant_id=credenciales.get("tenant_id", ""),
+            client_id=credenciales.get("client_id", ""),
+            client_secret=credenciales.get("client_secret", ""),
+            drive_id=credenciales.get("drive_id", ""),
+            carpeta_cv=carpeta,
         )
 
     @staticmethod
@@ -206,7 +189,7 @@ class GraphClient:
                 "Verifica el Drive ID y la ruta."
             )
         if respuesta.status_code == 403:
-            raise OneDriveError(
+            raise SinPermisoLecturaError(
                 "La aplicación no tiene permiso de lectura sobre este repositorio. "
                 "Revisa los permisos concedidos en Entra ID."
             )
@@ -218,20 +201,20 @@ class GraphClient:
     # --- Sincronización ------------------------------------------------------
 
     def listar_documentos(
-        self, delta_link: Optional[str] = None
-    ) -> tuple[list[DocumentoOneDrive], Optional[str]]:
+        self, cursor: Optional[str] = None
+    ) -> tuple[list[DocumentoRepositorio], Optional[str]]:
         """
         Delta query: la primera corrida trae todo, las siguientes solo lo que
-        cambió. Retorna (documentos, nuevo_delta_link).
+        cambió. El cursor es el delta link de Graph.
         """
-        if delta_link:
-            url = delta_link
+        if cursor:
+            url = cursor
         elif self.carpeta_cv:
             url = f"{GRAPH_BASE}/drives/{self.drive_id}/root:{self.carpeta_cv}:/delta"
         else:
             url = f"{GRAPH_BASE}/drives/{self.drive_id}/root/delta"
 
-        documentos: list[DocumentoOneDrive] = []
+        documentos: list[DocumentoRepositorio] = []
         siguiente_delta: Optional[str] = None
 
         while url:
@@ -246,9 +229,9 @@ class GraphClient:
 
         return documentos, siguiente_delta
 
-    def descargar(self, id_onedrive: str) -> bytes:
+    def descargar(self, id_documento: str) -> bytes:
         """Descarga el contenido en memoria. El archivo no se persiste (RNF14)."""
-        url = f"{GRAPH_BASE}/drives/{self.drive_id}/items/{id_onedrive}/content"
+        url = f"{GRAPH_BASE}/drives/{self.drive_id}/items/{id_documento}/content"
         try:
             respuesta = httpx.get(url, headers=self._headers(), timeout=120, follow_redirects=True)
             respuesta.raise_for_status()
@@ -257,14 +240,14 @@ class GraphClient:
         return respuesta.content
 
     @staticmethod
-    def _mapear(item: dict) -> Optional[DocumentoOneDrive]:
+    def _mapear(item: dict) -> Optional[DocumentoRepositorio]:
         nombre = item.get("name", "")
         if "folder" in item or not nombre.lower().endswith(EXTENSIONES_VALIDAS):
             return None
 
         modificado = item.get("lastModifiedDateTime")
-        return DocumentoOneDrive(
-            id_onedrive=item["id"],
+        return DocumentoRepositorio(
+            id_documento=item["id"],
             nombre_archivo=nombre,
             ruta=item.get("parentReference", {}).get("path", ""),
             url_web=item.get("webUrl"),

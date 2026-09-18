@@ -30,4 +30,6 @@ class EstadoIndiceResponse(BaseModel):
 class SincronizacionResponse(BaseModel):
     documentos_detectados: int
     documentos_encolados: int
+    #: Documentos registrados que no se pudieron mandar a indexar todavía.
+    documentos_aplazados: int = 0
     mensaje: str

@@ -11,8 +11,8 @@ from backend.infrastructure.llm.embeddings import ProveedorEmbeddings, serializa
 from backend.infrastructure.loaders.chunker import dividir_en_fragmentos
 from backend.infrastructure.loaders.docx_loader import extraer_texto_docx
 from backend.infrastructure.loaders.pdf_loader import ExtraccionError, extraer_texto_pdf
-from backend.domain.services.onedrive_config_service import OneDriveConfigService
-from backend.infrastructure.onedrive.graph_client import OneDriveError
+from backend.domain.services.repositorio_config_service import RepositorioConfigService
+from backend.infrastructure.repositorio.base import RepositorioError
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 
@@ -23,8 +23,9 @@ class IndexacionService:
         self.hojas = HojaDeVidaRepository(db)
         self.candidatos = CandidatoRepository(db)
         self.embeddings = ProveedorEmbeddings()
-        # Cliente construido con la configuración registrada por el administrador (HU-05).
-        self.onedrive = OneDriveConfigService(db).cliente_activo()
+        # Cliente del origen registrado por el administrador (HU-05): OneDrive
+        # o Google Drive, indistinto para esta clase.
+        self.repositorio = RepositorioConfigService(db).cliente_activo()
 
     def indexar_hoja(self, hoja_id: str) -> bool:
         """
@@ -36,8 +37,8 @@ class IndexacionService:
             return False
 
         try:
-            contenido = self.onedrive.descargar(hoja.id_onedrive)
-        except OneDriveError as exc:
+            contenido = self.repositorio.descargar(hoja.id_documento)
+        except RepositorioError as exc:
             self.hojas.marcar_no_procesable(hoja_id, f"No se pudo descargar: {exc}")
             return False
 
