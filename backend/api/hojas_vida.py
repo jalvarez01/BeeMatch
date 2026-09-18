@@ -10,7 +10,7 @@ from backend.infrastructure.persistence.models.hoja_vida import (
 )
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.schemas.hoja_vida import EstadoIndiceResponse, SincronizacionResponse
-from backend.domain.services.onedrive_config_service import OneDriveNoConfiguradoError
+from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
 from backend.security import ROL_ADMINISTRADOR, exigir_rol, get_current_user
 from backend.workers.scheduler import sincronizar_y_encolar
 
@@ -40,14 +40,29 @@ def sincronizar(
     """HU-05, HU-16: sincronización bajo demanda contra la carpeta configurada."""
     try:
         resultado = sincronizar_y_encolar()
-    except OneDriveNoConfiguradoError as exc:
+    except RepositorioNoConfiguradoError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         # HU-26: el error se explica, no se traga.
         raise HTTPException(status_code=502, detail=f"No fue posible sincronizar: {exc}")
     BitacoraService(db).registrar(ACCION_SINCRONIZACION, usuario_id=current_user.id)
+
+    aplazados = resultado["documentos_aplazados"]
+    if aplazados:
+        # La sincronización sí ocurrió: los documentos quedaron registrados y
+        # pendientes. Se dice cuántos y por qué, en vez de reportar un fallo
+        # que no fue (HU-26).
+        mensaje = (
+            f"Sincronización completada: {resultado['documentos_detectados']} documentos "
+            f"registrados. {aplazados} quedaron pendientes de indexar. "
+            f"{resultado['motivo_aplazamiento']}"
+        )
+    else:
+        mensaje = "Sincronización iniciada. La indexación continúa en segundo plano."
+
     return SincronizacionResponse(
         documentos_detectados=resultado["documentos_detectados"],
         documentos_encolados=resultado["documentos_encolados"],
-        mensaje="Sincronización iniciada. La indexación continúa en segundo plano.",
+        documentos_aplazados=aplazados,
+        mensaje=mensaje,
     )
