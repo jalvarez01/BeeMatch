@@ -49,6 +49,14 @@ class SincronizacionService:
                     "fecha_modificacion": documento.fecha_modificacion,
                 }
             )
+
+            if documento.formato == "NO_SOPORTADO": # Registrar como no procesados archivos con formato no soportado.
+                self.repo.marcar_no_procesable(
+                    hoja.id,
+                    f"Formato no soportado: {documento.nombre_archivo}",
+                )
+                continue
+
             if necesita_reindexar:
                 a_indexar.append(hoja.id)
 

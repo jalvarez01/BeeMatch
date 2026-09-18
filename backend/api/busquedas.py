@@ -20,6 +20,7 @@ from backend.schemas.busqueda import (
 from backend.security import get_current_user
 from backend.workers.busqueda_worker import ejecutar_busqueda
 from backend.workers.queue import encolar
+from backend.workers.scheduler import sincronizar_y_encolar
 
 router = APIRouter()
 
@@ -40,6 +41,8 @@ def ejecutar(
 
     busqueda_id = BusquedaService(db).encolar(solicitud_id)
     solicitudes.cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
+    # Sincroniza Google Drive antes de ejecutar la búsqueda.
+    sincronizar_y_encolar()
     encolar(ejecutar_busqueda, busqueda_id)
 
     BitacoraService(db).registrar(

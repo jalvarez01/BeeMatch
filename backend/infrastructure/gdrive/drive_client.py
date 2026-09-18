@@ -276,9 +276,10 @@ class GoogleDriveClient(RepositorioDocumentos):
 
             cuerpo = self._get(f"{DRIVE_BASE}/files", parametros)
 
-            for archivo in cuerpo.get("files", []):
-                if archivo.get("mimeType") in MIMES_VALIDOS:
-                    yield archivo
+            for archivo in cuerpo.get("files", []): # devuelve tmb archivos no soportados
+                if archivo.get("mimeType") == "application/vnd.google-apps.folder":
+                    continue
+                yield archivo
 
             page_token = cuerpo.get("nextPageToken")
             if not page_token:
@@ -375,7 +376,7 @@ class GoogleDriveClient(RepositorioDocumentos):
             nombre_archivo=archivo.get("name", ""),
             ruta=self.folder_id,
             url_web=archivo.get("webViewLink"),
-            formato=FORMATO_POR_MIME.get(mime, "PDF"),
+            formato=FORMATO_POR_MIME.get(mime, "NO_SOPORTADO"),
             # Los documentos nativos de Google no exponen md5Checksum: para
             # ellos el cambio se detecta por modifiedTime (RD5).
             hash_contenido=archivo.get("md5Checksum"),
