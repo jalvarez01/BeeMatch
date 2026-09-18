@@ -6,6 +6,11 @@ sqlalchemy==2.0.35
 python-dotenv==1.0.1
 pyjwt==2.9.0
 
+# Cifrado de las credenciales del repositorio en base de datos (HU-05, RNF10).
+# Fernet sale de aquí: hoy llega como dependencia transitiva de otros
+# paquetes, pero el cifrado no puede depender de eso.
+cryptography==50.0.1
+
 # Base de datos
 psycopg[binary]==3.2.3
 pgvector==0.3.5
