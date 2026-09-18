@@ -45,10 +45,19 @@ GDRIVE_ARCHIVO_CREDENCIALES = Path(
 GDRIVE_CARPETA_ID = os.getenv("GDRIVE_CARPETA_ID", "1H7-p-d3auJOzrw660zGfmKa5drW0Hn_V")
 
 # --- Servicio de IA (RNF33: configurable sin recompilar) ---------------------
+# Son dos proveedores distintos y cada uno lleva su clave: Anthropic no ofrece
+# API de embeddings, así que el re-ranking va contra Claude y la vectorización
+# contra el endpoint de embeddings de OpenAI.
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODELO = os.getenv("LLM_MODELO", "claude-sonnet-4-6")
+LLM_MODELO = os.getenv("LLM_MODELO", "claude-opus-5")
+
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 EMBEDDING_MODELO = os.getenv("EMBEDDING_MODELO", "text-embedding-3-small")
 EMBEDDING_DIMENSIONES = int(os.getenv("EMBEDDING_DIMENSIONES", "1536"))
+EMBEDDING_URL = os.getenv("EMBEDDING_URL", "https://api.openai.com/v1/embeddings")
+# Textos por petición. El endpoint acepta lotes; mandarlos de a uno multiplica
+# las llamadas en la ingesta inicial.
+EMBEDDING_LOTE = int(os.getenv("EMBEDDING_LOTE", "96"))
 
 # --- Parámetros del motor de matching (RNF02) --------------------------------
 TOP_N_RESULTADOS = int(os.getenv("TOP_N_RESULTADOS", "5"))
