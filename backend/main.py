@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,6 +16,8 @@ from backend.api import (
 from backend.config import ALLOWED_ORIGINS
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import init_db
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="BeeMatch API",
@@ -42,6 +46,7 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 def on_startup():
     init_db()
     _sembrar_parametros()
+    _sembrar_repositorio()
 
     # El planificador solo arranca si APScheduler está instalado y hay un
     # origen de hojas de vida configurado, sea cual sea el proveedor.
@@ -87,6 +92,78 @@ def _sembrar_parametros():
         for clave, valor in defaults.items():
             if not repo.get(clave):
                 repo.establecer(clave, valor)
+    finally:
+        db.close()
+
+
+def _sembrar_repositorio():
+    """
+    Semilla de la conexión al repositorio de hojas de vida (HU-05).
+
+    Registra Google Drive con el archivo de cuenta de servicio que vive en la
+    raíz del proyecto, para que el equipo no tenga que configurar la conexión a
+    mano en cada máquina. Pasa por el servicio de dominio, así que se aplican
+    la validación contra Drive y el cifrado de credenciales de siempre.
+
+    La configuración que un administrador registró desde la interfaz manda: si
+    ya hay una activa, esta función no toca nada. Cualquier fallo se registra y
+    la aplicación arranca igual, sin origen configurado.
+    """
+    import json
+
+    from backend.config import GDRIVE_ARCHIVO_CREDENCIALES, GDRIVE_CARPETA_ID
+    from backend.domain.services.repositorio_config_service import RepositorioConfigService
+    from backend.infrastructure.persistence.database import SessionLocal
+    from backend.infrastructure.persistence.repositories.configuracion_repo import (
+        RepositorioConfigRepository,
+    )
+    from backend.infrastructure.repositorio.base import TIPO_GDRIVE
+
+    db = SessionLocal()
+    try:
+        if RepositorioConfigRepository(db).get_activa():
+            return
+
+        ruta = GDRIVE_ARCHIVO_CREDENCIALES
+        if not ruta.is_file():
+            logger.info(
+                "Sin semilla de repositorio: no existe %s. Registra la conexión desde "
+                "Configuración.",
+                ruta,
+            )
+            return
+
+        contenido = ruta.read_text(encoding="utf-8")
+        try:
+            json.loads(contenido)
+        except ValueError as exc:
+            logger.warning(
+                "La semilla de repositorio %s no es un JSON válido (%s). Se omite.", ruta, exc
+            )
+            return
+
+        guardado, resultado = RepositorioConfigService(db).guardar(
+            TIPO_GDRIVE,
+            GDRIVE_CARPETA_ID,
+            {"credenciales_json": contenido},
+        )
+
+        if guardado:
+            logger.info(
+                "Repositorio sembrado desde %s: Google Drive, carpeta %s, %s documentos.",
+                ruta,
+                GDRIVE_CARPETA_ID,
+                resultado.documentos_detectados,
+            )
+        else:
+            logger.warning(
+                "La semilla de repositorio %s no pasó la validación con Google Drive: %s %s",
+                ruta,
+                resultado.mensaje,
+                resultado.detalle or "",
+            )
+    except Exception:  # la aplicación arranca aunque la semilla falle
+        logger.exception("No se pudo sembrar la configuración del repositorio de hojas de vida.")
     finally:
         db.close()
 

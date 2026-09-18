@@ -35,6 +35,15 @@ ONEDRIVE_CARPETA_CV = os.getenv("ONEDRIVE_CARPETA_CV", "/HojasDeVida")
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 SYNC_INTERVALO_HORAS = int(os.getenv("SYNC_INTERVALO_HORAS", "6"))
 
+# Semilla de Google Drive: archivo de la cuenta de servicio en la raíz del
+# proyecto y carpeta de hojas de vida compartida con esa cuenta. Sirve para que
+# el equipo no tenga que registrar la conexión a mano en cada máquina. El
+# archivo está en .gitignore y nunca se versiona (RNF10).
+GDRIVE_ARCHIVO_CREDENCIALES = Path(
+    os.getenv("GDRIVE_ARCHIVO_CREDENCIALES", str(BASE_DIR / "beematch-credenciales.json"))
+)
+GDRIVE_CARPETA_ID = os.getenv("GDRIVE_CARPETA_ID", "1H7-p-d3auJOzrw660zGfmKa5drW0Hn_V")
+
 # --- Servicio de IA (RNF33: configurable sin recompilar) ---------------------
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODELO = os.getenv("LLM_MODELO", "claude-sonnet-4-6")

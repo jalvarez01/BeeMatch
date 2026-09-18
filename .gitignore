@@ -99,3 +99,11 @@ desktop.ini
 *.docx
 *.doc
 !docs/**/*.pdf
+
+# --- Credenciales de cuenta de servicio ---------------------------------------
+# Semilla local de la conexión a Google Drive: contiene la llave privada de la
+# cuenta de servicio y no se versiona nunca (RNF10).
+*-credenciales.json
+service-account*.json
+beematch-credenciales.json
+
