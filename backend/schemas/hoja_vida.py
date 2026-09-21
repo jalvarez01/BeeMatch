@@ -25,6 +25,10 @@ class EstadoIndiceResponse(BaseModel):
     pendientes: int
     no_procesables: int
     ultima_sincronizacion: Optional[datetime] = None
+    #: Hay documentos por analizar todavía. Mientras sea True la pantalla sigue consultando.
+    en_proceso: bool = False
+    #: HU-17: mensaje final cuando ya no queda nada pendiente. None mientras se analiza.
+    resumen: Optional[str] = None
 
 
 class SincronizacionResponse(BaseModel):

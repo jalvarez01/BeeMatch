@@ -4,12 +4,16 @@ configurado cada SYNC_INTERVALO_HORAS. También puede lanzarse bajo demanda
 desde la interfaz.
 """
 
+import logging
+
 from backend.config import SYNC_INTERVALO_HORAS
-from backend.infrastructure.llm.embeddings import ProveedorEmbeddingsNoDisponibleError
+from backend.infrastructure.llm.embeddings import EmbeddingsError, ProveedorEmbeddingsNoDisponibleError
 from backend.infrastructure.repositorio.sync_service import SincronizacionService
 from backend.infrastructure.persistence.database import SessionLocal
 from backend.workers.ingesta_worker import indexar_hoja_de_vida
 from backend.workers.queue import encolar
+
+logger = logging.getLogger(__name__)
 
 
 def sincronizar_y_encolar() -> dict:
@@ -40,9 +44,20 @@ def sincronizar_y_encolar() -> dict:
             except ProveedorEmbeddingsNoDisponibleError as exc:
                 # Le falta al sistema, no al documento: reintentar con los
                 # demás daría el mismo resultado.
-                aplazados = len(hojas) - posicion
+                aplazados += len(hojas) - posicion
                 motivo_aplazamiento = str(exc)
                 break
+            except EmbeddingsError as exc:
+                # HU-17/RNF19: un fallo puntual del proveedor (red, timeout, un
+                # lote rechazado) no debe tumbar el resto de la corrida. La hoja
+                # queda PENDIENTE y se reintenta sola en la siguiente
+                # sincronización (ver SincronizacionService).
+                logger.warning(
+                    "Fallo puntual de embeddings en %s, se reintentará: %s", hoja_id, exc
+                )
+                aplazados += 1
+                motivo_aplazamiento = str(exc)
+                continue
 
         return {
             "documentos_detectados": resultado["documentos_detectados"],
