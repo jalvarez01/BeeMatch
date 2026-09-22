@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ejecutarBusqueda } from '../api/busquedas'
+import { listarRoles } from '../api/candidatos'
 import { actualizarSolicitud, crearSolicitud, obtenerSolicitud } from '../api/solicitudes'
 import { IconSpark } from '../components/Icons'
 import type { Criterio, SolicitudPayload, TipoCriterio } from '../types'
 
-const ROLES = ['Backend Developer', 'Frontend Developer', 'Data Engineer', 'QA Automation']
 const EXPERIENCIAS = [1, 3, 5, 8]
 
 /** HU-08, HU-09, HU-10, HU-11, HU-12, HU-15. */
@@ -24,6 +24,15 @@ export default function NuevaBusqueda() {
   const [idiomas, setIdiomas] = useState<string[]>([])
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [roles, setRoles] = useState<string[]>([])
+
+  // Los roles salen de lo que la IA identificó en las hojas de vida: al
+  // cargar perfiles de un área nueva, aparecen aquí sin tocar código.
+  useEffect(() => {
+    listarRoles()
+      .then((disponibles) => setRoles(disponibles.map((r) => r.nombre)))
+      .catch(() => setRoles([]))
+  }, [])
 
   // HU-11 / HU-14 / HU-15: precarga de un borrador o de una solicitud duplicada.
   useEffect(() => {
@@ -144,12 +153,24 @@ export default function NuevaBusqueda() {
 
         <div className="bm-field">
           <label htmlFor="rol">Rol requerido</label>
-          <select id="rol" value={rol} onChange={(e) => setRol(e.target.value)}>
-            <option value="">Seleccionar rol</option>
-            {ROLES.map((r) => (
-              <option key={r}>{r}</option>
+          {/*
+            Texto libre, no una lista cerrada: el rol no filtra, se suma a la
+            consulta que resuelven los embeddings y el re-ranking, así que
+            acepta cualquier cargo. La lista solo sugiere los que ya existen
+            en el repositorio.
+          */}
+          <input
+            id="rol"
+            list="roles-sugeridos"
+            placeholder="Escribir o elegir rol"
+            value={rol}
+            onChange={(e) => setRol(e.target.value)}
+          />
+          <datalist id="roles-sugeridos">
+            {roles.map((r) => (
+              <option key={r} value={r} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         <div className="bm-field">

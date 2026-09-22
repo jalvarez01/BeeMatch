@@ -38,3 +38,15 @@ class CandidatoResponse(BaseModel):
     experiencia: list[ExperienciaResponse] = []
 
     model_config = {"from_attributes": True}
+
+
+class RolDisponibleResponse(BaseModel):
+    """
+    Un rol presente en el repositorio y cuántos candidatos lo tienen.
+
+    Alimenta el filtro de la nueva búsqueda. La lista no es fija: crece con
+    los perfiles que se vayan cargando.
+    """
+
+    nombre: str
+    candidatos: int

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -13,6 +14,26 @@ from backend.infrastructure.persistence.models.hoja_vida import (
     ESTADO_NO_PROCESABLE,
     ESTADO_PENDIENTE,
 )
+
+
+def _misma_fecha(guardada: Optional[datetime], entrante: Optional[datetime]) -> bool:
+    """
+    Compara dos fechas de modificación sin que la zona horaria las separe.
+
+    El proveedor las entrega con zona (UTC) y SQLite las devuelve sin ella,
+    porque no guarda el huso. Comparadas tal cual, un datetime naive y uno
+    aware nunca son iguales: toda hoja parecería modificada en cada
+    sincronización y el repositorio entero se reindexaría cada vez, con su
+    costo en llamadas al modelo. Todo el proyecto trabaja en UTC (`utcnow`),
+    así que una fecha sin zona se interpreta como UTC.
+    """
+    if guardada is None or entrante is None:
+        return guardada is None and entrante is None
+    if guardada.tzinfo is None:
+        guardada = guardada.replace(tzinfo=timezone.utc)
+    if entrante.tzinfo is None:
+        entrante = entrante.replace(tzinfo=timezone.utc)
+    return guardada == entrante
 
 
 class HojaDeVidaRepository:
@@ -42,9 +63,8 @@ class HojaDeVidaRepository:
             self.db.refresh(hoja)
             return hoja, True
 
-        cambio = (
-            existente.hash_contenido != datos.get("hash_contenido")
-            or existente.fecha_modificacion != datos.get("fecha_modificacion")
+        cambio = existente.hash_contenido != datos.get("hash_contenido") or not _misma_fecha(
+            existente.fecha_modificacion, datos.get("fecha_modificacion")
         )
         for clave, valor in datos.items():
             setattr(existente, clave, valor)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.domain.services import indexacion_service
 from backend.domain.services.indexacion_service import IndexacionService
+from backend.infrastructure.llm.llm_provider import RespuestaIA
 from backend.infrastructure.persistence import models  # noqa: F401
 from backend.infrastructure.persistence.database import Base
 from backend.infrastructure.persistence.models.hoja_vida import (
@@ -37,6 +38,25 @@ class EmbeddingsFalso:
         return [[0.1, 0.2, 0.3] for _ in textos]
 
 
+class LLMFalso:
+    """Responde el perfil estructurado sin salir a la red (HU-18)."""
+
+    def __init__(self, datos: dict | None = None):
+        self.datos = datos if datos is not None else {
+            "nombre": "Ana Perez",
+            "rol_principal": "Desarrolladora Backend",
+            "anios_experiencia": 6,
+            "ubicacion": "Medellin",
+            "resumen": "Perfil de prueba.",
+            "tecnologias": [{"nombre": "Java", "categoria": "TECNOLOGIA"}],
+        }
+        self.llamadas = 0
+
+    def completar_json(self, system, prompt, max_reintentos=3):
+        self.llamadas += 1
+        return RespuestaIA(datos=self.datos)
+
+
 @pytest.fixture()
 def db():
     motor = create_engine("sqlite://")
@@ -52,6 +72,7 @@ def _servicio(db, documentos: dict[str, bytes]) -> IndexacionService:
     servicio.hojas = HojaDeVidaRepository(db)
     servicio.candidatos = CandidatoRepository(db)
     servicio.embeddings = EmbeddingsFalso()
+    servicio.llm = LLMFalso()
     servicio.repositorio = RepositorioFalso(documentos)
     return servicio
 
