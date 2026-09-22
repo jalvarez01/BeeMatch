@@ -24,7 +24,7 @@ from backend.infrastructure.persistence.models.hoja_vida import (
 )
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
-from backend.tests.conftest import crear_pdf
+from tests.documentos_hu17 import crear_pdf
 
 PERFIL_COMPLETO = {
     "nombre": "Ana Maria Restrepo",

@@ -23,9 +23,10 @@ msal==1.31.0
 # servicio. Las llamadas REST van con httpx, igual que las de Graph.
 google-auth==2.35.0
 
-# Servicio de IA. Claude (re-ranking y explicación) va por el SDK oficial;
-# los embeddings son de otro proveedor y van con httpx.
-anthropic==1.6.0
+# Servicio de IA. El re-ranking y la explicación (etapa 3) van por el SDK
+# oficial de OpenAI; los embeddings son del mismo proveedor pero van con httpx
+# (ver infrastructure/llm/embeddings.py).
+openai==3.17.0
 
 # Procesamiento de documentos
 pypdf[crypto]==5.0.1

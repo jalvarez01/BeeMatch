@@ -22,3 +22,16 @@ class DocumentoDanadoError(ExtraccionError):
 
 class DocumentoSinTextoError(ExtraccionError):
     """El documento se abre bien pero no contiene texto extraíble."""
+
+
+class ExtraccionNoDisponibleError(Exception):
+    """
+    Al servidor le falta algo para leer este formato: una dependencia de Python
+    o un programa externo.
+
+    No hereda de ExtraccionError a propósito. El problema es del entorno, no del
+    archivo, así que el documento no se marca como NO_PROCESABLE —quedaría con un
+    motivo falso y no se reintentaría nunca—: se queda PENDIENTE y la siguiente
+    sincronización lo vuelve a intentar. Es el mismo criterio que
+    `ProveedorEmbeddingsNoDisponibleError`.
+    """

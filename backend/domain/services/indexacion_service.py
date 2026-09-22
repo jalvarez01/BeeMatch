@@ -13,7 +13,10 @@ from backend.infrastructure.llm.embeddings import ProveedorEmbeddings, serializa
 from backend.infrastructure.llm.llm_provider import ProveedorLLM, ServicioIAError
 from backend.infrastructure.llm.prompts import SYSTEM_EXTRACCION, construir_prompt_extraccion
 from backend.infrastructure.loaders.chunker import dividir_en_fragmentos
-from backend.infrastructure.loaders.errores import ExtraccionError
+from backend.infrastructure.loaders.errores import (
+    ExtraccionError,
+    ExtraccionNoDisponibleError,
+)
 from backend.infrastructure.loaders.extractor import extraer_texto
 from backend.domain.services.repositorio_config_service import RepositorioConfigService
 from backend.infrastructure.persistence.models.hoja_vida import ESTADO_INDEXADA
@@ -87,6 +90,16 @@ class IndexacionService:
             texto = extraer_texto(contenido)
         except ExtraccionError as exc:
             self.hojas.marcar_no_procesable(hoja_id, str(exc))
+            return False
+        except ExtraccionNoDisponibleError as exc:
+            # Le falta al servidor, no al documento: marcarlo NO_PROCESABLE le
+            # pondría un motivo falso y no se volvería a intentar. Queda
+            # PENDIENTE y la próxima sincronización lo reintenta.
+            logger.warning(
+                "Falta una dependencia para leer %s, queda pendiente: %s",
+                hoja.nombre_archivo,
+                exc,
+            )
             return False
         except Exception as exc:  # noqa: BLE001
             # Un fallo inesperado al leer un documento lo marca a él; no debe

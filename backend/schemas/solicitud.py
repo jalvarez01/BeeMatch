@@ -4,7 +4,8 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 TipoCriterio = Literal["TECNOLOGIA", "FRAMEWORK", "DOMINIO", "CERTIFICACION", "IDIOMA"]
-
+DESCRIPCION_MIN_CARACTERES = 15
+DESCRIPCION_MAX_CARACTERES = 1000
 
 class CriterioBase(BaseModel):
     tipo: TipoCriterio
@@ -22,7 +23,7 @@ class CriterioResponse(CriterioBase):
 class SolicitudCreate(BaseModel):
     """HU-08 (lenguaje natural) + HU-09 (criterios estructurados) + HU-12 (cliente)."""
 
-    descripcion_libre: str = Field(default="", max_length=1000)
+    descripcion_libre: str = Field(default="", max_length=DESCRIPCION_MAX_CARACTERES)
     rol_buscado: Optional[str] = None
     experiencia_min: Optional[int] = Field(default=None, ge=0, le=50)
     cliente: Optional[str] = None
@@ -32,7 +33,7 @@ class SolicitudCreate(BaseModel):
 
 
 class SolicitudUpdate(BaseModel):
-    descripcion_libre: Optional[str] = Field(default=None, max_length=1000)
+    descripcion_libre: Optional[str] = Field(default=None, max_length=DESCRIPCION_MAX_CARACTERES)
     rol_buscado: Optional[str] = None
     experiencia_min: Optional[int] = None
     cliente: Optional[str] = None

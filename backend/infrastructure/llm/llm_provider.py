@@ -5,9 +5,9 @@ Concentra en un solo punto: construcción de prompts, control de tokens,
 reintentos con backoff, validación del JSON de salida y registro de consumo.
 Cambiar de modelo o de proveedor es configuración, no refactorización (RNF33).
 
-El proveedor es Claude, a través del SDK oficial de Anthropic. El SDK ya
-reintenta los errores transitorios (429 y 5xx); el bucle de `completar_json`
-cubre además el caso de que el modelo devuelva un JSON que no parsea.
+El proveedor utiliza la API oficial de OpenAI. El SDK ya reintenta los
+errores transitorios (429 y 5xx); el bucle de `completar_json` cubre además
+el caso de que el modelo devuelva un JSON que no parsea.
 """
 
 import json
@@ -58,13 +58,13 @@ class ProveedorLLM:
                     "Falta configurar LLM_API_KEY, la clave del servicio de IA."
                 )
             try:
-                import anthropic
+                from openai import OpenAI
             except ImportError as exc:  # pragma: no cover
                 raise ServicioIAError(
-                    "Falta la dependencia anthropic. Instálala con: pip install anthropic"
+                    "Falta la dependencia openai. Instálala con: pip install openai"
                 ) from exc
 
-            self._cliente = anthropic.Anthropic(api_key=self.api_key)
+            self._cliente = OpenAI(api_key=self.api_key)
         return self._cliente
 
     def completar_json(
@@ -100,28 +100,41 @@ class ProveedorLLM:
 
     def _llamar(self, system: str, prompt: str) -> tuple[str, int, int]:
         """Una llamada al modelo. Retorna (texto, tokens_entrada, tokens_salida)."""
-        respuesta = self.cliente.messages.create(
-            model=self.modelo,
-            max_tokens=MAX_TOKENS,
-            thinking={"type": "adaptive"},
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        # `cliente` valida la clave y la presencia del SDK, así que a partir
+        # de aquí se puede importar el tipo de error sin miedo.
+        cliente = self.cliente
+        from openai import AuthenticationError
 
-        if respuesta.stop_reason == "refusal":
-            # No tiene sentido reintentar: la negativa no es transitoria.
-            detalle = getattr(respuesta.stop_details, "explanation", "") or ""
-            raise ServicioIARechazoError(
-                f"El modelo declinó procesar la solicitud. {detalle}".strip()
+        try:
+            respuesta = cliente.chat.completions.create(
+                model=self.modelo,
+                # RNF33: cambiar de modelo es configuración. `max_tokens` quedó
+                # deprecado y los modelos de razonamiento lo rechazan con 400;
+                # `max_completion_tokens` lo aceptan todos.
+                max_completion_tokens=MAX_TOKENS,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
             )
+        except AuthenticationError as exc:
+            # La clave es inválida o no tiene acceso al modelo: reintentar no
+            # cambia nada y la interfaz lo explica como configuración faltante.
+            raise ServicioIANoConfiguradoError(
+                f"El servicio de IA rechazó la credencial: {exc}"
+            ) from exc
 
-        # La respuesta puede traer bloques de razonamiento además del texto;
-        # solo se concatenan los de texto, que son los que llevan el JSON.
-        texto = "".join(b.text for b in respuesta.content if b.type == "text")
+        choice = respuesta.choices[0]
+        if getattr(choice, "finish_reason", None) == "content_filter":
+            raise ServicioIARechazoError("El modelo declinó procesar la solicitud por filtros de contenido.")
+
+        texto = choice.message.content
         if not texto:
             raise ServicioIAError("El modelo no devolvió contenido de texto.")
 
-        return texto, respuesta.usage.input_tokens, respuesta.usage.output_tokens
+        usage = respuesta.usage
+        return texto, usage.prompt_tokens, usage.completion_tokens
 
     @staticmethod
     def _parsear(bruto: str) -> dict[str, Any]:

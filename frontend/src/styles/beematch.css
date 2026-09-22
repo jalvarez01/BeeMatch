@@ -89,15 +89,12 @@
 
 /* ---------- botones ---------- */
 .bm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: background .15s, border-color .15s; }
-/* Las variantes van prefijadas con `.bm` a propósito: el reset `.bm button`
-   de más arriba tiene mayor especificidad que una sola clase y, sin el
-   prefijo, dejaba el fondo transparente hasta que el mouse pasaba encima. */
 
-/* Acción principal: fondo amarillo fijo, visible siempre. */
+/* Acción principal: color amarillo fijo visible siempre */
 .bm .bm-btn-primary { background: #E9B92C; color: var(--ink); font-weight: 600; }
 .bm .bm-btn-primary:hover { background: #E9B92C; }
 
-/* Acción secundaria: mismo gris del botón "Configuración" de la barra lateral. */
+/* Acción secundaria */
 .bm .bm-btn-soft { background: #F4F4F5; color: var(--ink-soft); }
 .bm .bm-btn-soft:hover { background: #F4F4F5; }
 
@@ -106,6 +103,7 @@
 
 .bm .bm-btn-ghost { background: var(--white); border: 1px solid var(--line); }
 .bm .bm-btn-ghost:hover { border-color: #C9CDD4; }
+.bm .bm-btn:disabled { opacity: .5; cursor: not-allowed; }
 .bm-btn-link { color: var(--muted); font-size: 13px; }
 .bm-btn-link:hover { color: var(--ink); }
 .bm-btn-back { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; margin-bottom: 18px; }
@@ -122,12 +120,24 @@
 }
 .bm-field input:focus, .bm-field select:focus { outline: none; color: var(--ink); }
 .bm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Ajustes visuales de selects, chips y textarea */
+.bm-field select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 18px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239CA3AF' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right center; background-size: 14px;
+}
+.bm-field input:disabled, .bm-field select:disabled { color: var(--muted-2); cursor: not-allowed; }
+.bm-field-chips { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
 .bm-textarea {
-  width: 100%; min-height: 78px; resize: vertical; border: 1px solid var(--line);
+  width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line);
   border-radius: 8px; padding: 12px 14px; font-size: 13px; background: var(--white);
 }
 .bm-textarea::placeholder { color: var(--muted-2); }
 .bm-textarea:focus { outline: none; border-color: var(--yellow); }
+.bm-textarea[data-error='true'] { border-color: var(--red); }
+.bm-textarea:disabled { color: var(--muted-2); cursor: not-allowed; background: #FAFAFA; }
 .bm-count { text-align: right; font-size: 11px; color: var(--muted-2); margin-top: 4px; }
 
 /* ---------- chips y badges ---------- */
