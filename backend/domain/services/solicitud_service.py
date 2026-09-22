@@ -16,12 +16,29 @@ from backend.infrastructure.persistence.repositories.cliente_repo import (
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from backend.schemas.solicitud import (
+    DESCRIPCION_MIN_CARACTERES,
     CriterioResponse,
     SolicitudCreate,
     SolicitudResponse,
     SolicitudUpdate,
 )
 
+MENSAJE_DESCRIPCION_CORTA = (
+    "La descripción es muy corta. Describe el perfil con más detalle "
+    f"(mínimo {DESCRIPCION_MIN_CARACTERES} caracteres)."
+)
+
+
+def descripcion_insuficiente(descripcion: Optional[str]) -> bool:
+    """
+    HU-08: un texto libre que se escribió pero quedó por debajo del mínimo no le
+    da contexto suficiente al servicio de IA.
+
+    El texto vacío no entra aquí: lo resuelve la validación de campos
+    obligatorios (HU-10), que también permite buscar solo con el rol.
+    """
+    texto = (descripcion or "").strip()
+    return 0 < len(texto) < DESCRIPCION_MIN_CARACTERES
 
 class SolicitudService:
     def __init__(self, db: Session):
