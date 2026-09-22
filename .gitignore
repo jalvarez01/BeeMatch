@@ -108,3 +108,8 @@ desktop.ini
 service-account*.json
 beematch-credenciales.json
 
+
+# --- Contexto local del asistente ---------------------------------------------
+# Notas de trabajo de cada quien, no del proyecto. Ya se subió por accidente dos
+# veces (a4b9e5d y 4e0b1b6); la regla es para que no vuelva a pasar.
+CLAUDE.md
