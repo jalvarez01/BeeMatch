@@ -37,7 +37,9 @@ class HojaDeVidaModel(Base):
     nombre_archivo: Mapped[str] = mapped_column(String(300))
     ruta: Mapped[str] = mapped_column(String(600), default="")
     url_web: Mapped[Optional[str]] = mapped_column(String(900), nullable=True)
-    formato: Mapped[str] = mapped_column(String(10), default="PDF")
+    # 20 y no 10: además de PDF y DOCX aquí entra "NO_SOPORTADO" (HU-16,
+    # criterio 4). SQLite no valida el largo, Postgres sí.
+    formato: Mapped[str] = mapped_column(String(20), default="PDF")
     hash_contenido: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     fecha_modificacion: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

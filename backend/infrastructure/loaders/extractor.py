@@ -11,7 +11,11 @@ import struct
 
 from backend.infrastructure.loaders.doc_loader import extraer_texto_doc
 from backend.infrastructure.loaders.docx_loader import extraer_texto_docx
-from backend.infrastructure.loaders.errores import DocumentoDanadoError, DocumentoProtegidoError
+from backend.infrastructure.loaders.errores import (
+    DocumentoDanadoError,
+    DocumentoProtegidoError,
+    ExtraccionNoDisponibleError,
+)
 from backend.infrastructure.loaders.pdf_loader import extraer_texto_pdf
 
 # Firmas de archivo.
@@ -29,8 +33,10 @@ def extraer_texto(contenido: bytes) -> str:
     """
     Devuelve el texto del documento (PDF, .docx o .doc).
 
-    Lanza un ExtraccionError si no se puede: DocumentoProtegidoError,
-    DocumentoDanadoError o DocumentoSinTextoError. Nunca otra cosa.
+    Lanza un ExtraccionError si el documento no se puede leer:
+    DocumentoProtegidoError, DocumentoDanadoError o DocumentoSinTextoError. Si lo
+    que falta es una dependencia del servidor, lanza ExtraccionNoDisponibleError,
+    que no es culpa del archivo. Nunca otra cosa.
     """
     if not contenido:
         raise DocumentoDanadoError("El archivo está vacío.")
@@ -53,7 +59,14 @@ def _extraer_ole(contenido: bytes) -> str:
     contraseña, que Word guarda cifrado dentro de un contenedor OLE
     (EncryptedPackage).
     """
-    import olefile
+    try:
+        import olefile
+    except ImportError as exc:  # pragma: no cover
+        # Se importa aquí y no arriba para que un entorno sin olefile pueda
+        # igual arrancar la aplicación y leer PDF y .docx.
+        raise ExtraccionNoDisponibleError(
+            f"El servidor no tiene la dependencia 'olefile', necesaria para los .doc: {exc}"
+        ) from exc
 
     try:
         ole = olefile.OleFileIO(io.BytesIO(contenido))

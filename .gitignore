@@ -99,7 +99,7 @@ desktop.ini
 *.docx
 *.doc
 !docs/**/*.pdf
-!backend/tests/fixtures/*
+!tests/fixtures/cv_ejemplo.doc
 
 # --- Credenciales de cuenta de servicio ---------------------------------------
 # Semilla local de la conexión a Google Drive: contiene la llave privada de la

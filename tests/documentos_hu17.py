@@ -1,4 +1,8 @@
-"""Fábricas de documentos de prueba para HU-17. No se versionan CVs reales."""
+"""
+Fábricas de documentos de prueba para HU-17. No se versionan CVs reales.
+
+No es un conftest: no define fixtures, solo funciones que las pruebas importan.
+"""
 
 import io
 import shutil

@@ -8,7 +8,7 @@ from backend.infrastructure.loaders.errores import (
     ExtraccionError,
 )
 from backend.infrastructure.loaders.extractor import extraer_texto
-from backend.tests.conftest import (
+from tests.documentos_hu17 import (
     crear_docx,
     crear_pdf,
     cifrar_docx,

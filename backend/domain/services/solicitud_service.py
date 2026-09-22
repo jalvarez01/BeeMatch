@@ -40,6 +40,7 @@ def descripcion_insuficiente(descripcion: Optional[str]) -> bool:
     texto = (descripcion or "").strip()
     return 0 < len(texto) < DESCRIPCION_MIN_CARACTERES
 
+
 class SolicitudService:
     def __init__(self, db: Session):
         self.db = db

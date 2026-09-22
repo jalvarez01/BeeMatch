@@ -5,7 +5,9 @@ Concentra en un solo punto: construcción de prompts, control de tokens,
 reintentos con backoff, validación del JSON de salida y registro de consumo.
 Cambiar de modelo o de proveedor es configuración, no refactorización (RNF33).
 
-El proveedor utiliza la API oficial de OpenAI.
+El proveedor utiliza la API oficial de OpenAI. El SDK ya reintenta los
+errores transitorios (429 y 5xx); el bucle de `completar_json` cubre además
+el caso de que el modelo devuelva un JSON que no parsea.
 """
 
 import json
@@ -16,7 +18,8 @@ from typing import Any
 from backend.config import LLM_API_KEY, LLM_MODELO
 
 
-# Techo de salida por respuesta.
+# Techo de salida por respuesta. El re-ranking devuelve un JSON con los
+# finalistas y su explicación, no un texto largo.
 MAX_TOKENS = 16000
 
 
@@ -97,20 +100,30 @@ class ProveedorLLM:
 
     def _llamar(self, system: str, prompt: str) -> tuple[str, int, int]:
         """Una llamada al modelo. Retorna (texto, tokens_entrada, tokens_salida)."""
+        # `cliente` valida la clave y la presencia del SDK, así que a partir
+        # de aquí se puede importar el tipo de error sin miedo.
+        cliente = self.cliente
+        from openai import AuthenticationError
+
         try:
-            respuesta = self.cliente.chat.completions.create(
+            respuesta = cliente.chat.completions.create(
                 model=self.modelo,
-                max_tokens=MAX_TOKENS,
+                # RNF33: cambiar de modelo es configuración. `max_tokens` quedó
+                # deprecado y los modelos de razonamiento lo rechazan con 400;
+                # `max_completion_tokens` lo aceptan todos.
+                max_completion_tokens=MAX_TOKENS,
                 response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
             )
-        except Exception as exc:
-            if "401" in str(exc) or "authentication" in str(exc).lower():
-                raise ServicioIANoConfiguradoError(f"Error de autenticación con la IA: {exc}") from exc
-            raise
+        except AuthenticationError as exc:
+            # La clave es inválida o no tiene acceso al modelo: reintentar no
+            # cambia nada y la interfaz lo explica como configuración faltante.
+            raise ServicioIANoConfiguradoError(
+                f"El servicio de IA rechazó la credencial: {exc}"
+            ) from exc
 
         choice = respuesta.choices[0]
         if getattr(choice, "finish_reason", None) == "content_filter":

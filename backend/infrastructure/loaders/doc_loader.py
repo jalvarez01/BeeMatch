@@ -15,7 +15,7 @@ from pathlib import Path
 from backend.infrastructure.loaders.errores import (
     DocumentoDanadoError,
     DocumentoSinTextoError,
-    ExtraccionError,
+    ExtraccionNoDisponibleError,
 )
 
 TIMEOUT_SEGUNDOS = 60
@@ -23,7 +23,7 @@ TIMEOUT_SEGUNDOS = 60
 
 def extraer_texto_doc(contenido: bytes) -> str:
     if shutil.which("antiword") is None:
-        raise ExtraccionError(
+        raise ExtraccionNoDisponibleError(
             "El servidor no tiene 'antiword' instalado, por lo que no puede leer archivos .doc."
         )
 
