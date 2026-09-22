@@ -122,6 +122,7 @@ export default function NuevaBusqueda() {
           className="bm-textarea"
           maxLength={DESCRIPCION_MAX}
           value={descripcion}
+          disabled={enviando}
           onChange={(e) => {
             setDescripcion(e.target.value)
             setErrorDescripcion('')
@@ -151,6 +152,7 @@ export default function NuevaBusqueda() {
             id="cliente"
             placeholder="Seleccionar cliente"
             value={cliente}
+            disabled={enviando}
             onChange={(e) => setCliente(e.target.value)}
           />
         </div>
@@ -161,13 +163,14 @@ export default function NuevaBusqueda() {
             id="proyecto"
             placeholder="Nombre del proyecto"
             value={proyecto}
+            disabled={enviando}
             onChange={(e) => setProyecto(e.target.value)}
           />
         </div>
 
         <div className="bm-field">
           <label htmlFor="rol">Rol requerido</label>
-          <select id="rol" value={rol} onChange={(e) => setRol(e.target.value)}>
+          <select id="rol" value={rol} disabled={enviando} onChange={(e) => setRol(e.target.value)}>
             <option value="">Seleccionar rol</option>
             {ROLES.map((r) => (
               <option key={r}>{r}</option>
@@ -180,6 +183,7 @@ export default function NuevaBusqueda() {
           <select
             id="experiencia"
             value={experiencia}
+            disabled={enviando}
             onChange={(e) => setExperiencia(e.target.value === '' ? '' : Number(e.target.value))}
           >
             <option value="">Seleccionar exp</option>
@@ -197,6 +201,7 @@ export default function NuevaBusqueda() {
           placeholder="Buscar tecnología…"
           valores={tecnologias}
           onCambio={setTecnologias}
+          deshabilitado={enviando}
         />
 
         <CampoChips
@@ -205,6 +210,7 @@ export default function NuevaBusqueda() {
           placeholder="Agregar idioma…"
           valores={idiomas}
           onCambio={setIdiomas}
+          deshabilitado={enviando}
         />
       </div>
 
@@ -219,7 +225,7 @@ export default function NuevaBusqueda() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button className="bm-btn bm-btn-soft" onClick={guardarBorrador}>
+        <button className="bm-btn bm-btn-soft" onClick={guardarBorrador} disabled={enviando}>
           Guardar borrador
         </button>
         <button className="bm-btn bm-btn-primary" onClick={buscar} disabled={enviando}>
@@ -245,12 +251,14 @@ function CampoChips({
   placeholder,
   valores,
   onCambio,
+  deshabilitado,
 }: {
   id: string
   etiqueta: string
   placeholder: string
   valores: string[]
   onCambio: (valores: string[]) => void
+  deshabilitado?: boolean
 }) {
   const agregar = (evento: React.KeyboardEvent<HTMLInputElement>) => {
     if (evento.key !== 'Enter') return
@@ -262,21 +270,27 @@ function CampoChips({
   }
 
   return (
-    <>
+    <div className="bm-field-chips">
       <div className="bm-field">
         <label htmlFor={id}>{etiqueta}</label>
-        <input id={id} placeholder={placeholder} onKeyDown={agregar} />
+        <input id={id} placeholder={placeholder} onKeyDown={agregar} disabled={deshabilitado} />
       </div>
-      <div className="bm-chips">
-        {valores.map((valor) => (
-          <span className="bm-chip" key={valor}>
-            {valor}
-            <button onClick={() => onCambio(valores.filter((v) => v !== valor))} aria-label={`Quitar ${valor}`}>
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-    </>
+      {valores.length > 0 && (
+        <div className="bm-chips">
+          {valores.map((valor) => (
+            <span className="bm-chip" key={valor}>
+              {valor}
+              <button
+                onClick={() => onCambio(valores.filter((v) => v !== valor))}
+                aria-label={`Quitar ${valor}`}
+                disabled={deshabilitado}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
