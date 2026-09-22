@@ -77,6 +77,14 @@ class HojaDeVidaRepository:
             .all()
         )
 
+    def listar_por_estado(self, estado: str) -> list[HojaDeVidaModel]:
+        return (
+            self.db.query(HojaDeVidaModel)
+            .filter(HojaDeVidaModel.estado_procesamiento == estado)
+            .order_by(HojaDeVidaModel.nombre_archivo)
+            .all()
+        )
+
     def contar_por_estado(self, estado: str) -> int:
         return (
             self.db.query(HojaDeVidaModel)

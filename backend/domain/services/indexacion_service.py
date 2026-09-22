@@ -5,16 +5,21 @@ Se ejecuta una sola vez por versión de documento (RNF03). El worker de ingesta
 llama a `indexar_hoja` por cada documento encolado.
 """
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.llm.embeddings import ProveedorEmbeddings, serializar
 from backend.infrastructure.loaders.chunker import dividir_en_fragmentos
-from backend.infrastructure.loaders.docx_loader import extraer_texto_docx
-from backend.infrastructure.loaders.pdf_loader import ExtraccionError, extraer_texto_pdf
+from backend.infrastructure.loaders.errores import ExtraccionError
+from backend.infrastructure.loaders.extractor import extraer_texto
 from backend.domain.services.repositorio_config_service import RepositorioConfigService
+from backend.infrastructure.persistence.models.hoja_vida import ESTADO_INDEXADA
 from backend.infrastructure.repositorio.base import RepositorioError
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
+
+logger = logging.getLogger(__name__)
 
 
 class IndexacionService:
@@ -35,6 +40,10 @@ class IndexacionService:
         hoja = self.hojas.get_by_id(hoja_id)
         if not hoja:
             return False
+        if hoja.estado_procesamiento == ESTADO_INDEXADA:
+            # Un cambio en el documento la devuelve a PENDIENTE, así que si
+            # llega aquí ya indexada es un trabajo repetido en la cola.
+            return True
 
         try:
             contenido = self.repositorio.descargar(hoja.id_documento)
@@ -42,13 +51,19 @@ class IndexacionService:
             self.hojas.marcar_no_procesable(hoja_id, f"No se pudo descargar: {exc}")
             return False
 
+        # HU-17: el formato real sale del contenido (PDF, .docx o .doc), no de
+        # la extensión. Un documento dañado o con contraseña se marca y la
+        # corrida sigue con el siguiente.
         try:
-            if hoja.formato == "PDF":
-                texto, _ = extraer_texto_pdf(contenido)
-            else:
-                texto = extraer_texto_docx(contenido)
+            texto = extraer_texto(contenido)
         except ExtraccionError as exc:
             self.hojas.marcar_no_procesable(hoja_id, str(exc))
+            return False
+        except Exception as exc:  # noqa: BLE001
+            # Un fallo inesperado al leer un documento lo marca a él; no debe
+            # tumbar la sincronización ni dejarlo PENDIENTE para siempre.
+            logger.exception("Error inesperado extrayendo el texto de %s", hoja.nombre_archivo)
+            self.hojas.marcar_no_procesable(hoja_id, f"Error inesperado al leer el documento: {exc}")
             return False
 
         fragmentos = dividir_en_fragmentos(texto)
