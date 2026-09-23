@@ -12,6 +12,7 @@ interfaz RepositorioDocumentos y no conoce al proveedor.
 from sqlalchemy.orm import Session
 
 from backend.domain.services.repositorio_config_service import RepositorioConfigService
+from backend.infrastructure.persistence.models.hoja_vida import ESTADO_PENDIENTE
 from backend.infrastructure.persistence.repositories.configuracion_repo import (
     RepositorioConfigRepository,
 )
@@ -57,7 +58,10 @@ class SincronizacionService:
                 )
                 continue
 
-            if necesita_reindexar:
+            # Además de lo nuevo o modificado, se reintenta lo que quedó PENDIENTE
+            # de una corrida anterior (cola caída, proveedor de embeddings sin
+            # clave...): si no, un documento sin cambios no se analizaría nunca.
+            if necesita_reindexar or hoja.estado_procesamiento == ESTADO_PENDIENTE:
                 a_indexar.append(hoja.id)
 
         # Los orígenes sin delta (Google Drive) devuelven None: se conserva el

@@ -45,11 +45,11 @@ GDRIVE_ARCHIVO_CREDENCIALES = Path(
 GDRIVE_CARPETA_ID = os.getenv("GDRIVE_CARPETA_ID", "1H7-p-d3auJOzrw660zGfmKa5drW0Hn_V")
 
 # --- Servicio de IA (RNF33: configurable sin recompilar) ---------------------
-# Son dos proveedores distintos y cada uno lleva su clave: Anthropic no ofrece
-# API de embeddings, así que el re-ranking va contra Claude y la vectorización
-# contra el endpoint de embeddings de OpenAI.
+# El proveedor es OpenAI para todo: el re-ranking y la explicación (etapa 3) y
+# la vectorización de CV y consultas. Cada uso lleva su variable de clave para
+# poder separar proyectos o cupos, pero puede ser la misma clave.
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODELO = os.getenv("LLM_MODELO", "claude-opus-5")
+LLM_MODELO = os.getenv("LLM_MODELO", "gpt-4o-mini")
 
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 EMBEDDING_MODELO = os.getenv("EMBEDDING_MODELO", "text-embedding-3-small")

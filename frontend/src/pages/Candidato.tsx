@@ -49,7 +49,9 @@ export default function Candidato() {
                 {candidato.nombre}
               </h1>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px' }}>
-                {candidato.rol_principal} · {candidato.anios_experiencia} años de experiencia
+                {candidato.rol_principal ?? 'Rol no especificado en la hoja de vida'}
+                {candidato.anios_experiencia !== null &&
+                  ` · ${candidato.anios_experiencia} años de experiencia`}
               </p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {candidato.tecnologias.map((t) => (

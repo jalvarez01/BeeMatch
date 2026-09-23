@@ -36,12 +36,10 @@ MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 MIME_DOC = "application/msword"
 MIME_GOOGLE_DOC = "application/vnd.google-apps.document"
 
-# Solo hojas de vida: PDF, Word y documentos nativos de Google.
-MIMES_VALIDOS = (MIME_PDF, MIME_DOCX, MIME_DOC, MIME_GOOGLE_DOC)
-
-# Formato con el que se registra la hoja de vida. Determina qué loader usa la
-# indexación, por eso los Google Docs figuran como PDF: es el formato al que se
-# exportan al descargarlos.
+# Formato con el que se registra la hoja de vida. Es informativo: el lector lo
+# decide el contenido del archivo (HU-17). Los Google Docs figuran como PDF
+# porque es el formato al que se exportan al descargarlos. Lo que no está aquí
+# se registra como NO_SOPORTADO (HU-16, criterio 4).
 FORMATO_POR_MIME = {
     MIME_PDF: "PDF",
     MIME_DOCX: "DOCX",
