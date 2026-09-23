@@ -26,5 +26,8 @@ olefile==0.47
 # Exportación a Excel
 openpyxl==3.1.5
 
+# Análisis estático
+ruff==0.16.8
+
 # Pruebas
 pytest==8.3.3

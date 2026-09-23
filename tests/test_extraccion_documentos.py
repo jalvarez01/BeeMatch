@@ -9,10 +9,10 @@ from backend.infrastructure.loaders.errores import (
 )
 from backend.infrastructure.loaders.extractor import extraer_texto
 from tests.documentos_hu17 import (
-    crear_docx,
-    crear_pdf,
     cifrar_docx,
     cifrar_pdf,
+    crear_docx,
+    crear_pdf,
     doc_ejemplo,
     marcar_doc_como_cifrado,
     requiere_antiword,

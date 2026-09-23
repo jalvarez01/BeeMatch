@@ -36,9 +36,9 @@ import time
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import SessionLocal
 from backend.infrastructure.persistence.models.hoja_vida import (
-    CandidatoModel,
     ESTADO_INDEXADA,
     ESTADO_PENDIENTE,
+    CandidatoModel,
     HojaDeVidaModel,
 )
 from backend.workers.ingesta_worker import indexar_hoja_de_vida

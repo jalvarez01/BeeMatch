@@ -9,7 +9,7 @@ modelo. Eso además hace imposible el criterio 4 de HU-18 (menos de dos
 minutos), porque la búsqueda sincroniza antes de ejecutarse.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -23,7 +23,7 @@ from backend.infrastructure.persistence.models.hoja_vida import (
 )
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 
-FECHA = datetime(2026, 9, 18, 18, 36, 16, tzinfo=timezone.utc)
+FECHA = datetime(2026, 9, 18, 18, 36, 16, tzinfo=UTC)
 
 
 @pytest.fixture()

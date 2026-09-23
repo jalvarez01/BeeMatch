@@ -1,7 +1,7 @@
 """Utilidades compartidas por los modelos ORM."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def nuevo_id() -> str:
@@ -9,4 +9,4 @@ def nuevo_id() -> str:
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

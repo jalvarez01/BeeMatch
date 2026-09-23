@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_SINCRONIZACION, BitacoraService
+from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.models.hoja_vida import (
     ESTADO_INDEXADA,
@@ -14,7 +15,6 @@ from backend.schemas.hoja_vida import (
     HojaDeVidaResponse,
     SincronizacionResponse,
 )
-from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
 from backend.security import ROL_ADMINISTRADOR, exigir_rol, get_current_user
 from backend.workers.scheduler import sincronizar_y_encolar
 

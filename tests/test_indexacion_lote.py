@@ -17,9 +17,9 @@ from backend.infrastructure.persistence.models.hoja_vida import (
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from tests.documentos_hu17 import (
+    cifrar_pdf,
     crear_docx,
     crear_pdf,
-    cifrar_pdf,
     doc_ejemplo,
     requiere_antiword,
 )

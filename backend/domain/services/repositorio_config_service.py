@@ -20,15 +20,15 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.crypto import CifradoError, cifrar, descifrar, enmascarar
+from backend.infrastructure.persistence.repositories.configuracion_repo import (
+    RepositorioConfigRepository,
+)
 from backend.infrastructure.repositorio.base import (
     TIPOS_VALIDOS,
     RepositorioDocumentos,
     ResultadoPrueba,
 )
 from backend.infrastructure.repositorio.factory import campos_secretos, crear_cliente
-from backend.infrastructure.persistence.repositories.configuracion_repo import (
-    RepositorioConfigRepository,
-)
 
 # Secretos que son un documento completo, no una cadena corta: se enmascaran
 # enteros, porque mostrar su cola no ayuda a reconocerlos y sí filtra contenido.
