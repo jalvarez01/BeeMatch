@@ -17,7 +17,6 @@ from typing import Any
 
 from backend.config import LLM_API_KEY, LLM_MODELO
 
-
 # Techo de salida por respuesta. El re-ranking devuelve un JSON con los
 # finalistas y su explicación, no un texto largo.
 MAX_TOKENS = 16000

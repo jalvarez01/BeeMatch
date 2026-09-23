@@ -1,19 +1,17 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models._base import utcnow
 from backend.infrastructure.persistence.models.hoja_vida import (
+    ESTADO_INDEXADA,
+    ESTADO_NO_PROCESABLE,
+    ESTADO_PENDIENTE,
     CandidatoHabilidadModel,
     CandidatoModel,
     FragmentoCVModel,
     HojaDeVidaModel,
-)
-from backend.infrastructure.persistence.models.hoja_vida import (
-    ESTADO_INDEXADA,
-    ESTADO_NO_PROCESABLE,
-    ESTADO_PENDIENTE,
 )
 
 
@@ -31,9 +29,9 @@ def _misma_fecha(guardada: Optional[datetime], entrante: Optional[datetime]) -> 
     if guardada is None or entrante is None:
         return guardada is None and entrante is None
     if guardada.tzinfo is None:
-        guardada = guardada.replace(tzinfo=timezone.utc)
+        guardada = guardada.replace(tzinfo=UTC)
     if entrante.tzinfo is None:
-        entrante = entrante.replace(tzinfo=timezone.utc)
+        entrante = entrante.replace(tzinfo=UTC)
     return guardada == entrante
 
 

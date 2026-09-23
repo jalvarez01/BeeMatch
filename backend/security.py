@@ -18,7 +18,7 @@ import base64
 import hashlib
 import hmac
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import jwt
@@ -106,8 +106,8 @@ def crear_token(usuario_id: str, correo: str, rol: str) -> str:
         "sub": usuario_id,
         "correo": correo,
         "rol": rol,
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRACION_HORAS),
+        "iat": datetime.now(UTC),
+        "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRACION_HORAS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 

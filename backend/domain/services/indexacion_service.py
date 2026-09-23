@@ -9,6 +9,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from backend.domain.services.repositorio_config_service import RepositorioConfigService
 from backend.infrastructure.llm.embeddings import ProveedorEmbeddings, serializar
 from backend.infrastructure.llm.llm_provider import ProveedorLLM, ServicioIAError
 from backend.infrastructure.llm.prompts import SYSTEM_EXTRACCION, construir_prompt_extraccion
@@ -18,11 +19,10 @@ from backend.infrastructure.loaders.errores import (
     ExtraccionNoDisponibleError,
 )
 from backend.infrastructure.loaders.extractor import extraer_texto
-from backend.domain.services.repositorio_config_service import RepositorioConfigService
 from backend.infrastructure.persistence.models.hoja_vida import ESTADO_INDEXADA
-from backend.infrastructure.repositorio.base import RepositorioError
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
+from backend.infrastructure.repositorio.base import RepositorioError
 
 logger = logging.getLogger(__name__)
 

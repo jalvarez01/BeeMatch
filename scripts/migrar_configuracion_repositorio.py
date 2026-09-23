@@ -27,7 +27,7 @@ Uso normal:
 import json
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import inspect, text
 
@@ -124,8 +124,8 @@ def migrar_configuracion() -> None:
                     # El delta link sigue siendo válido: mismo drive, misma carpeta.
                     "cursor": fila["delta_link"],
                     "actualizado_por": fila["actualizado_por"],
-                    "created_at": fila["created_at"] or datetime.now(timezone.utc),
-                    "updated_at": fila["updated_at"] or datetime.now(timezone.utc),
+                    "created_at": fila["created_at"] or datetime.now(UTC),
+                    "updated_at": fila["updated_at"] or datetime.now(UTC),
                 },
             )
             migradas += 1

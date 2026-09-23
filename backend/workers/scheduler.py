@@ -8,8 +8,8 @@ import logging
 
 from backend.config import SYNC_INTERVALO_HORAS
 from backend.infrastructure.llm.embeddings import EmbeddingsError, ProveedorEmbeddingsNoDisponibleError
-from backend.infrastructure.repositorio.sync_service import SincronizacionService
 from backend.infrastructure.persistence.database import SessionLocal
+from backend.infrastructure.repositorio.sync_service import SincronizacionService
 from backend.workers.ingesta_worker import indexar_hoja_de_vida
 from backend.workers.queue import encolar
 
