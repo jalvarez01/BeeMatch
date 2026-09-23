@@ -131,6 +131,12 @@ class HojaDeVidaRepository:
         self.db.query(CandidatoModel).filter(CandidatoModel.hoja_de_vida_id == hoja_id).delete()
         self.db.commit()
 
+    def listar_por_ids(self, ids: list[str]) -> list[HojaDeVidaModel]:
+        """Varias hojas de una vez, para no consultar una por cada candidato."""
+        if not ids:
+            return []
+        return self.db.query(HojaDeVidaModel).filter(HojaDeVidaModel.id.in_(ids)).all()
+
     def listar_ausentes(self, id_documentos_presentes: set[str]) -> list[HojaDeVidaModel]:
         """Hojas de vida cuyo documento ya no aparece en el listado del origen."""
         return [
