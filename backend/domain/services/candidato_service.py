@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
-from backend.schemas.candidato import CandidatoResponse, HabilidadResponse
+from backend.schemas.candidato import (
+    CandidatoResponse,
+    HabilidadResponse,
+    RolDisponibleResponse,
+)
 
 
 class CandidatoService:
@@ -38,6 +42,13 @@ class CandidatoService:
             respuesta.url_hoja_vida = hoja.url_web
 
         return respuesta
+
+    def roles_disponibles(self) -> list[RolDisponibleResponse]:
+        """Roles que la IA identificó en las hojas de vida ya indexadas."""
+        return [
+            RolDisponibleResponse(nombre=nombre, candidatos=total)
+            for nombre, total in self.repo.listar_roles()
+        ]
 
     def listar(self, pagina: int = 1, por_pagina: int = 20) -> list[CandidatoResponse]:
         candidatos = self.repo.listar(limite=por_pagina, desplazamiento=(pagina - 1) * por_pagina)
