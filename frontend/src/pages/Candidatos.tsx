@@ -49,7 +49,10 @@ export default function Candidatos() {
                 ))}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--muted-2)' }}>{candidato.ruta_hoja_vida}</div>
+            {/* La ruta del documento en Drive no le dice nada al reclutador: el
+                enlace del botón ya lleva al archivo. Se deja la celda vacía
+                para no alterar la grilla de la fila. */}
+            <div />
             <div />
             {candidato.url_hoja_vida ? (
               <a
@@ -58,7 +61,7 @@ export default function Candidatos() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Ver CV ↗
+                Ver CV
               </a>
             ) : (
               /* Sin enlace no hay a dónde ir: se muestra apagado en vez de un botón muerto. */
