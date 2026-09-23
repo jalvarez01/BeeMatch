@@ -52,6 +52,11 @@ CATEGORIAS_VALIDAS = {
 # El modelo a veces escribe la palabra en vez de dejar el campo nulo.
 TEXTOS_NULOS = {"null", "none", "n/a", "na", "no especificado", "no especifica"}
 
+# Largo mínimo de una cita para darla por encontrada. Solo descarta lo
+# degenerado (una letra suelta coincide con cualquier texto); una cita corta
+# pero real como "AWS" sí demuestra que la tecnología aparece en el documento.
+MIN_CARACTERES_CITA = 3
+
 
 class IndexacionService:
     def __init__(self, db: Session, llm: ProveedorLLM | None = None):
@@ -117,7 +122,7 @@ class IndexacionService:
         for fragmento, vector in zip(fragmentos, vectores):
             fragmento["embedding"] = serializar(vector)
 
-        self.candidatos.reemplazar_fragmentos(hoja_id, fragmentos)
+        guardados = self.candidatos.reemplazar_fragmentos(hoja_id, fragmentos)
 
         perfil, tecnologias = self._extraer_perfil(texto, hoja.nombre_archivo)
         candidato = self.candidatos.crear_o_reemplazar(hoja_id, perfil)
@@ -126,7 +131,9 @@ class IndexacionService:
         # borrarlas. Una lista vacía sí es una respuesta: el documento no
         # declara ninguna tecnología y las viejas dejan de valer.
         if tecnologias is not None:
-            self.candidatos.reemplazar_habilidades(candidato.id, tecnologias)
+            self.candidatos.reemplazar_habilidades(
+                candidato.id, self._anclar_evidencias(tecnologias, guardados)
+            )
 
         self.hojas.marcar_indexada(hoja_id)
         return True
@@ -171,10 +178,14 @@ class IndexacionService:
         Respaldo sin IA: el nombre sale del archivo, que es como está
         organizado el repositorio de Bee. El resto queda sin determinar.
         """
+        # Todas las claves, incluida `ubicacion`: `crear_o_reemplazar` solo
+        # asigna lo que viene en el diccionario, así que omitir una dejaría el
+        # valor de una corrida anterior mezclado con este perfil.
         return {
             "nombre": IndexacionService._nombre_desde_archivo(nombre_archivo),
             "rol_principal": None,
             "anios_experiencia": None,
+            "ubicacion": None,
             "resumen": texto[:MAX_RESUMEN],
         }
 
@@ -210,13 +221,17 @@ class IndexacionService:
         return numero
 
     @classmethod
-    def _tecnologias(cls, valor: object) -> list[dict]:
+    def _tecnologias(cls, valor: object) -> list[dict] | None:
         """
         Normaliza la lista de tecnologías y descarta duplicados conservando el
         orden en que el modelo las nombró, que sigue al del documento.
+
+        Una lista vacía significa que el documento no declara ninguna. `None`
+        significa que el modelo no devolvió la lista —falta la clave o vino con
+        otra forma—, que no es lo mismo: ahí se conservan las que hubiera.
         """
-        if not isinstance(valor, list):
-            return []
+        if valor is None or not isinstance(valor, list):
+            return None
 
         vistas: set[str] = set()
         tecnologias: list[dict] = []
@@ -244,3 +259,48 @@ class IndexacionService:
                 break
 
         return tecnologias
+
+    # --- Anclaje de la evidencia (RNF28) -------------------------------------
+
+    @classmethod
+    def _anclar_evidencias(cls, tecnologias: list[dict], fragmentos: list) -> list[dict]:
+        """
+        Ata cada cita al fragmento del CV que la contiene.
+
+        RNF28: la evidencia que ve el reclutador tiene que poder rastrearse hasta
+        el documento. La cita la escribe el modelo, así que se busca entre los
+        fragmentos recién guardados y se le pega el id del que la contiene. Si no
+        aparece en ninguno se descarta: una cita que no está en la hoja de vida no
+        es evidencia, por verosímil que suene. La tecnología se conserva —el
+        modelo pudo leerla bien y redactar mal la cita—, pero sin respaldo que
+        mostrar, igual que el re-ranking degrada una coincidencia sin fragmento.
+        """
+        indice = [(cls._normalizar_cita(f.texto), f.id) for f in fragmentos]
+
+        ancladas = []
+        for tecnologia in tecnologias:
+            cita = tecnologia.get("evidencia_texto")
+            fragmento_id = cls._fragmento_que_contiene(cita, indice) if cita else None
+            ancladas.append(
+                {
+                    **tecnologia,
+                    "evidencia_texto": cita if fragmento_id else None,
+                    "fragmento_id": fragmento_id,
+                }
+            )
+        return ancladas
+
+    @classmethod
+    def _fragmento_que_contiene(cls, cita: str, indice: list[tuple[str, str]]) -> str | None:
+        aguja = cls._normalizar_cita(cita)
+        if len(aguja) < MIN_CARACTERES_CITA:
+            return None
+        for texto, fragmento_id in indice:
+            if aguja in texto:
+                return fragmento_id
+        return None
+
+    @staticmethod
+    def _normalizar_cita(texto: str) -> str:
+        """Un salto de línea del PDF no debe impedir reconocer la misma frase."""
+        return " ".join(texto.split()).casefold()

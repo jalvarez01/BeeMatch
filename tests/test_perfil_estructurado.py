@@ -116,19 +116,56 @@ def test_el_perfil_extraido_llena_los_cuatro_datos_de_la_tarjeta(db):
     assert sorted(tecnologias) == ["Java", "PostgreSQL", "Spring Boot"]
 
 
-def test_la_evidencia_de_cada_tecnologia_queda_guardada(db):
-    """RNF28: una habilidad afirmada tiene que poder señalar dónde aparece."""
+def test_la_evidencia_se_ancla_al_fragmento_que_la_contiene(db):
+    """
+    RNF28: una habilidad afirmada tiene que poder señalar dónde aparece, y ese
+    "dónde" es un fragmento guardado, no la palabra del modelo.
+    """
     documentos = {"hv_ana.pdf": crear_pdf()}
     hoja_id = _registrar(db, "hv_ana.pdf")
+    # La cita existe en el texto del PDF de prueba.
+    perfil = dict(
+        PERFIL_COMPLETO,
+        tecnologias=[
+            {"nombre": "Java", "categoria": "TECNOLOGIA", "evidencia_texto": "Java Spring Boot"}
+        ],
+    )
+    _servicio(db, LLMFalso(perfil), documentos).indexar_hoja(hoja_id)
+
+    repo = CandidatoRepository(db)
+    candidato = repo.get_by_hoja(hoja_id)
+    (_habilidad, relacion), = repo.listar_habilidades(candidato.id)
+
+    assert relacion.evidencia_texto == "Java Spring Boot"
+    assert relacion.fragmento_id is not None
+    # El id apunta a un fragmento real de esta hoja, y contiene la cita.
+    fragmento = repo.get_fragmento(relacion.fragmento_id)
+    assert fragmento is not None
+    assert fragmento.hoja_de_vida_id == hoja_id
+    assert "Java Spring Boot" in fragmento.texto
+
+
+def test_una_cita_que_no_esta_en_el_documento_no_se_guarda_como_evidencia(db):
+    """
+    El modelo puede redactar una cita verosímil que el CV no dice. Sin fragmento
+    que la respalde no se muestra: es el mismo criterio con el que el re-ranking
+    degrada una coincidencia sin `fragmento_id`. La tecnología se conserva.
+    """
+    documentos = {"hv_ana.pdf": crear_pdf()}
+    hoja_id = _registrar(db, "hv_ana.pdf")
+    # "Java 17" no aparece en el texto del PDF de prueba; "Java Spring Boot" sí.
     _servicio(db, LLMFalso(PERFIL_COMPLETO), documentos).indexar_hoja(hoja_id)
 
-    candidato = CandidatoRepository(db).get_by_hoja(hoja_id)
-    evidencias = {
-        habilidad.nombre: relacion.evidencia_texto
-        for habilidad, relacion in CandidatoRepository(db).listar_habilidades(candidato.id)
-    }
-    assert evidencias["Java"] == "Java 17"
-    assert evidencias["Spring Boot"] == "Spring Boot 3"
+    repo = CandidatoRepository(db)
+    candidato = repo.get_by_hoja(hoja_id)
+    habilidades = dict(
+        (habilidad.nombre, relacion) for habilidad, relacion in repo.listar_habilidades(candidato.id)
+    )
+
+    assert sorted(habilidades) == ["Java", "PostgreSQL", "Spring Boot"]
+    for relacion in habilidades.values():
+        assert relacion.evidencia_texto is None
+        assert relacion.fragmento_id is None
 
 
 # --- Degradación cuando la IA no está --------------------------------------
@@ -170,6 +207,27 @@ def test_un_fallo_de_la_ia_no_borra_las_tecnologias_ya_extraidas(db):
     candidato = CandidatoRepository(db).get_by_hoja(hoja_id)
     tecnologias = [h.nombre for h, _ in CandidatoRepository(db).listar_habilidades(candidato.id)]
     assert sorted(tecnologias) == ["Java", "PostgreSQL", "Spring Boot"]
+
+
+def test_reindexar_sin_ia_no_deja_datos_de_la_corrida_anterior(db):
+    """
+    El respaldo sin IA limpia el perfil entero. Si dejara alguna clave fuera, ese
+    valor viejo quedaría junto a los demás en null y la ficha mostraría una
+    mezcla de dos corridas.
+    """
+    documentos = {"Ana_Restrepo.pdf": crear_pdf()}
+    hoja_id = _registrar(db, "Ana_Restrepo.pdf")
+    _servicio(db, LLMFalso(PERFIL_COMPLETO), documentos).indexar_hoja(hoja_id)
+    assert CandidatoRepository(db).get_by_hoja(hoja_id).ubicacion == "Medellin"
+
+    HojaDeVidaRepository(db).get_by_id(hoja_id).estado_procesamiento = "PENDIENTE"
+    db.commit()
+    _servicio(db, LLMCaido(), documentos).indexar_hoja(hoja_id)
+
+    candidato = CandidatoRepository(db).get_by_hoja(hoja_id)
+    assert candidato.rol_principal is None
+    assert candidato.anios_experiencia is None
+    assert candidato.ubicacion is None
 
 
 def test_una_lista_vacia_de_tecnologias_si_limpia_las_anteriores(db):
@@ -242,9 +300,15 @@ def test_la_lista_de_tecnologias_tiene_tope():
     assert len(IndexacionService._tecnologias(crudo)) == MAX_TECNOLOGIAS
 
 
-def test_una_respuesta_sin_la_lista_de_tecnologias_no_revienta():
-    assert IndexacionService._tecnologias(None) == []
-    assert IndexacionService._tecnologias("Java, Python") == []
+def test_una_lista_vacia_y_una_lista_ausente_no_significan_lo_mismo():
+    """
+    `[]` es una respuesta del modelo: el documento no declara tecnologías, y las
+    que hubiera de antes dejan de valer. `None` es que no contestó esa parte, y
+    ahí las anteriores se conservan (ver indexar_hoja).
+    """
+    assert IndexacionService._tecnologias([]) == []
+    assert IndexacionService._tecnologias(None) is None
+    assert IndexacionService._tecnologias("Java, Python") is None
 
 
 def test_si_el_modelo_no_da_el_nombre_se_usa_el_del_archivo(db):
