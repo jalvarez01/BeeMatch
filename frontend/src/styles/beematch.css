@@ -88,7 +88,7 @@
 .bm-dark { background: var(--ink); color: #fff; border-radius: 12px; padding: 20px 24px; }
 
 /* ---------- botones ---------- */
-.bm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: background .15s, border-color .15s; }
+.bm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; text-decoration: none; transition: background .15s, border-color .15s; }
 
 /* Acción principal: color amarillo fijo visible siempre */
 .bm .bm-btn-primary { background: #E9B92C; color: var(--ink); font-weight: 600; }

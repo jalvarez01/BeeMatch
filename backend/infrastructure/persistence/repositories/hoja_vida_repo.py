@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models._base import utcnow
 from backend.infrastructure.persistence.models.hoja_vida import (
+    CandidatoHabilidadModel,
     CandidatoModel,
     FragmentoCVModel,
     HojaDeVidaModel,
@@ -115,5 +116,36 @@ class HojaDeVidaRepository:
     def eliminar_indice(self, hoja_id: str) -> None:
         """RNF16: derecho de supresión. Borra fragmentos y candidato derivados."""
         self.db.query(FragmentoCVModel).filter(FragmentoCVModel.hoja_de_vida_id == hoja_id).delete()
+        # Las habilidades cuelgan del candidato, no de la hoja: si no se borran
+        # aquí quedan huérfanas y la tabla crece con filas que no apuntan a nadie.
+        candidatos = [
+            c.id
+            for c in self.db.query(CandidatoModel.id)
+            .filter(CandidatoModel.hoja_de_vida_id == hoja_id)
+            .all()
+        ]
+        if candidatos:
+            self.db.query(CandidatoHabilidadModel).filter(
+                CandidatoHabilidadModel.candidato_id.in_(candidatos)
+            ).delete(synchronize_session=False)
         self.db.query(CandidatoModel).filter(CandidatoModel.hoja_de_vida_id == hoja_id).delete()
+        self.db.commit()
+
+    def listar_por_ids(self, ids: list[str]) -> list[HojaDeVidaModel]:
+        """Varias hojas de una vez, para no consultar una por cada candidato."""
+        if not ids:
+            return []
+        return self.db.query(HojaDeVidaModel).filter(HojaDeVidaModel.id.in_(ids)).all()
+
+    def listar_ausentes(self, id_documentos_presentes: set[str]) -> list[HojaDeVidaModel]:
+        """Hojas de vida cuyo documento ya no aparece en el listado del origen."""
+        return [
+            hoja
+            for hoja in self.db.query(HojaDeVidaModel).all()
+            if hoja.id_documento not in id_documentos_presentes
+        ]
+
+    def eliminar(self, hoja_id: str) -> None:
+        """Borra la referencia al documento. Lo derivado se quita con eliminar_indice."""
+        self.db.query(HojaDeVidaModel).filter(HojaDeVidaModel.id == hoja_id).delete()
         self.db.commit()
