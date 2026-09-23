@@ -1,9 +1,9 @@
 """
 Generación de embeddings. Aislada para poder cambiar de proveedor (RNF33).
 
-El proveedor es el endpoint de embeddings de OpenAI, distinto al del LLM:
-Anthropic no ofrece API de embeddings. Las llamadas van con httpx, igual que
-las de Microsoft Graph y Google Drive, para no sumar un tercer cliente HTTP.
+El proveedor es el endpoint de embeddings de OpenAI, el mismo que atiende el
+re-ranking. Las llamadas van con httpx y no con el SDK, igual que las de
+Microsoft Graph y Google Drive, para no sumar otro cliente HTTP.
 """
 
 import json

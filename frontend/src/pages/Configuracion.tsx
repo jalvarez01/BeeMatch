@@ -17,6 +17,17 @@ interface EstadoIndice {
   indexadas: number
   pendientes: number
   no_procesables: number
+  /** Quedan documentos por analizar: la pantalla sigue consultando. */
+  en_proceso: boolean
+  /** HU-17: mensaje de cierre con analizados y no procesados. Null mientras se analiza. */
+  resumen: string | null
+}
+
+/** HU-17: documento que no se pudo leer y el motivo (dañado, con contraseña...). */
+interface HojaNoProcesable {
+  id: string
+  nombre_archivo: string
+  motivo_error: string | null
 }
 
 interface Sincronizacion {
@@ -132,6 +143,7 @@ export default function Configuracion() {
   const [error, setError] = useState('')
 
   const [indice, setIndice] = useState<EstadoIndice | null>(null)
+  const [noProcesables, setNoProcesables] = useState<HojaNoProcesable[]>([])
   const [parametros, setParametros] = useState<Parametro[]>([])
   const [sincronizando, setSincronizando] = useState(false)
 
@@ -162,11 +174,28 @@ export default function Configuracion() {
       })
       .catch((e: Error) => setError(e.message))
 
-    apiFetch<EstadoIndice>('/hojas-vida/estado').then(setIndice).catch(() => undefined)
+    cargarIndice()
     apiFetch<Parametro[]>('/configuracion/parametros').then(setParametros).catch(() => undefined)
   }
 
+  // HU-17: conteo del análisis y detalle de los documentos que no se pudieron leer.
+  const cargarIndice = () => {
+    apiFetch<EstadoIndice>('/hojas-vida/estado').then(setIndice).catch(() => undefined)
+    apiFetch<HojaNoProcesable[]>('/hojas-vida/no-procesables')
+      .then(setNoProcesables)
+      .catch(() => undefined)
+  }
+
   useEffect(cargar, [])
+
+  // Mientras haya documentos por analizar se refresca solo; al llegar a cero
+  // el intervalo se limpia y queda el mensaje final.
+  const enProceso = indice?.en_proceso ?? false
+  useEffect(() => {
+    if (!enProceso) return
+    const temporizador = setInterval(cargarIndice, 4000)
+    return () => clearInterval(temporizador)
+  }, [enProceso])
 
   const setOneDrive = <K extends keyof FormularioOneDrive>(campo: K, valor: string) =>
     setOnedrive((previo) => ({ ...previo, [campo]: valor }))
@@ -541,6 +570,40 @@ export default function Configuracion() {
             <div className="n">{indice?.no_procesables ?? '—'}</div>
           </div>
         </div>
+
+        {indice?.en_proceso && (
+          <div className="bm-alert bm-alert-info" style={{ marginTop: 16, marginBottom: 0 }}>
+            Analizando documentos… quedan {indice.pendientes} por procesar.
+          </div>
+        )}
+
+        {indice?.resumen && (
+          <div
+            className={`bm-alert ${indice.no_procesables > 0 ? 'bm-alert-info' : 'bm-alert-ok'}`}
+            style={{ marginTop: 16, marginBottom: 0 }}
+          >
+            {indice.resumen}
+          </div>
+        )}
+
+        {noProcesables.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h3 className="bm-h2" style={{ fontSize: 13 }}>
+              Documentos que no pudieron procesarse
+            </h3>
+            {noProcesables.map((hoja) => (
+              <div
+                key={hoja.id}
+                style={{ padding: '8px 0', borderTop: '1px solid var(--yellow-line)', fontSize: 12 }}
+              >
+                <strong>{hoja.nombre_archivo}</strong>
+                <div style={{ color: 'var(--muted)', marginTop: 2 }}>
+                  {hoja.motivo_error ?? 'Sin detalle.'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ---------- HU-07 ---------- */}
