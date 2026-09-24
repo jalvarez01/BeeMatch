@@ -137,12 +137,15 @@ Los permisos sobre OneDrive deben ser **solo lectura** y limitados a la carpeta 
 
 ## Pendiente de implementar
 
-Tres puntos están marcados con `TODO` y son el trabajo del Sprint 1:
+Queda un `TODO` del Sprint 1:
 
-- `infrastructure/llm/embeddings.py` → llamada real al proveedor de embeddings.
-- `infrastructure/llm/llm_provider.py` → llamada real al modelo de lenguaje.
 - `domain/services/indexacion_service.py` → extracción del perfil estructurado con IA (hoy es una
   heurística sobre el nombre del archivo).
+
+El servicio de IA es OpenAI para todo. Necesita dos variables en `.env`: `LLM_API_KEY` (re-ranking y
+explicación de resultados) y `EMBEDDING_API_KEY` (vectorización de hojas de vida y consultas). Pueden llevar
+la misma clave; están separadas para poder usar proyectos o cupos distintos. Sin ellas la aplicación arranca
+igual: la sincronización registra los documentos y deja la indexación aplazada.
 
 La exportación a PDF (`domain/services/export_service.py`) está prevista para el Sprint 3; la
 exportación a XLSX ya funciona.

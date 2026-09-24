@@ -23,7 +23,7 @@ else:
 
 class HojaDeVidaModel(Base):
     """
-    Documento del repositorio de OneDrive.
+    Documento del repositorio configurado (OneDrive o Google Drive).
 
     RNF14: no se copia el archivo. Se guarda su referencia y el texto extraído.
     """
@@ -31,11 +31,15 @@ class HojaDeVidaModel(Base):
     __tablename__ = "hojas_de_vida"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=nuevo_id)
-    id_onedrive: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    # Identificador del documento en el origen. Es opaco y propio del
+    # proveedor: item id en OneDrive, file id en Google Drive.
+    id_documento: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     nombre_archivo: Mapped[str] = mapped_column(String(300))
     ruta: Mapped[str] = mapped_column(String(600), default="")
     url_web: Mapped[Optional[str]] = mapped_column(String(900), nullable=True)
-    formato: Mapped[str] = mapped_column(String(10), default="PDF")
+    # 20 y no 10: además de PDF y DOCX aquí entra "NO_SOPORTADO" (HU-16,
+    # criterio 4). SQLite no valida el largo, Postgres sí.
+    formato: Mapped[str] = mapped_column(String(20), default="PDF")
     hash_contenido: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     fecha_modificacion: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ejecutarBusqueda } from '../api/busquedas'
+import { listarRoles } from '../api/candidatos'
 import { actualizarSolicitud, crearSolicitud, obtenerSolicitud } from '../api/solicitudes'
 import { IconSpark } from '../components/Icons'
 import type { Criterio, SolicitudPayload, TipoCriterio } from '../types'
 
-const ROLES = ['Backend Developer', 'Frontend Developer', 'Data Engineer', 'QA Automation']
 const EXPERIENCIAS = [1, 3, 5, 8]
+
+const DESCRIPCION_MIN = 15
+const DESCRIPCION_MAX = 1000
+const MENSAJE_DESCRIPCION_CORTA = `La descripción es muy corta. Describe el perfil con más detalle (mínimo ${DESCRIPCION_MIN} caracteres).`
 
 /** HU-08, HU-09, HU-10, HU-11, HU-12, HU-15. */
 export default function NuevaBusqueda() {
@@ -16,6 +20,8 @@ export default function NuevaBusqueda() {
   const solicitudId = params.get('solicitud')
 
   const [descripcion, setDescripcion] = useState('')
+  const [errorDescripcion, setErrorDescripcion] = useState('')
+  const campoDescripcion = useRef<HTMLTextAreaElement>(null)
   const [cliente, setCliente] = useState('')
   const [proyecto, setProyecto] = useState('')
   const [rol, setRol] = useState('')
@@ -24,6 +30,15 @@ export default function NuevaBusqueda() {
   const [idiomas, setIdiomas] = useState<string[]>([])
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [roles, setRoles] = useState<string[]>([])
+
+  // Los roles salen de lo que la IA identificó en las hojas de vida: al
+  // cargar perfiles de un área nueva, aparecen aquí sin tocar código.
+  useEffect(() => {
+    listarRoles()
+      .then((disponibles) => setRoles(disponibles.map((r) => r.nombre)))
+      .catch(() => setRoles([]))
+  }, [])
 
   // HU-11 / HU-14 / HU-15: precarga de un borrador o de una solicitud duplicada.
   useEffect(() => {
@@ -72,6 +87,11 @@ export default function NuevaBusqueda() {
 
   const buscar = async () => {
     setError('')
+    if (descripcionMuyCorta(descripcion)) {
+      setErrorDescripcion(MENSAJE_DESCRIPCION_CORTA)
+      campoDescripcion.current?.focus()
+      return
+    }
     setEnviando(true)
     try {
       const solicitud = solicitudId
@@ -107,13 +127,26 @@ export default function NuevaBusqueda() {
           experiencia y requisitos.
         </p>
         <textarea
+          ref={campoDescripcion}
           className="bm-textarea"
-          maxLength={1000}
+          maxLength={DESCRIPCION_MAX}
           value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
+          disabled={enviando}
+          onChange={(e) => {
+            setDescripcion(e.target.value)
+            setErrorDescripcion('')
+          }}
+          data-error={errorDescripcion ? 'true' : undefined}
+          aria-invalid={errorDescripcion ? true : undefined}
+          aria-describedby={errorDescripcion ? 'descripcion-error' : undefined}
           placeholder="Ej. Necesito un desarrollador Backend Java Senior con mínimo 5 años de experiencia, conocimientos en Spring Boot y AWS, experiencia en el sector bancario e inglés B2."
         />
-        <div className="bm-count">{descripcion.length}/1000</div>
+        {errorDescripcion && (
+          <div id="descripcion-error" className="bm-error" role="alert">
+            {errorDescripcion}
+          </div>
+        )}
+        <div className="bm-count">{descripcion.length}/{DESCRIPCION_MAX}</div>
       </div>
 
       <h2 className="bm-h2">Detalles de la solicitud</h2>
@@ -128,6 +161,7 @@ export default function NuevaBusqueda() {
             id="cliente"
             placeholder="Seleccionar cliente"
             value={cliente}
+            disabled={enviando}
             onChange={(e) => setCliente(e.target.value)}
           />
         </div>
@@ -138,18 +172,32 @@ export default function NuevaBusqueda() {
             id="proyecto"
             placeholder="Nombre del proyecto"
             value={proyecto}
+            disabled={enviando}
             onChange={(e) => setProyecto(e.target.value)}
           />
         </div>
 
         <div className="bm-field">
           <label htmlFor="rol">Rol requerido</label>
-          <select id="rol" value={rol} onChange={(e) => setRol(e.target.value)}>
-            <option value="">Seleccionar rol</option>
-            {ROLES.map((r) => (
-              <option key={r}>{r}</option>
+          {/*
+            Texto libre, no una lista cerrada: el rol no filtra en SQL, se suma
+            a la consulta que resuelven los embeddings y el re-ranking, así que
+            acepta cualquier cargo. La lista solo sugiere los que la IA ya
+            identificó en las hojas de vida del repositorio.
+          */}
+          <input
+            id="rol"
+            list="roles-sugeridos"
+            placeholder="Escribir o elegir rol"
+            value={rol}
+            disabled={enviando}
+            onChange={(e) => setRol(e.target.value)}
+          />
+          <datalist id="roles-sugeridos">
+            {roles.map((r) => (
+              <option key={r} value={r} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         <div className="bm-field">
@@ -157,6 +205,7 @@ export default function NuevaBusqueda() {
           <select
             id="experiencia"
             value={experiencia}
+            disabled={enviando}
             onChange={(e) => setExperiencia(e.target.value === '' ? '' : Number(e.target.value))}
           >
             <option value="">Seleccionar exp</option>
@@ -174,6 +223,7 @@ export default function NuevaBusqueda() {
           placeholder="Buscar tecnología…"
           valores={tecnologias}
           onCambio={setTecnologias}
+          deshabilitado={enviando}
         />
 
         <CampoChips
@@ -182,6 +232,7 @@ export default function NuevaBusqueda() {
           placeholder="Agregar idioma…"
           valores={idiomas}
           onCambio={setIdiomas}
+          deshabilitado={enviando}
         />
       </div>
 
@@ -196,7 +247,7 @@ export default function NuevaBusqueda() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button className="bm-btn bm-btn-ghost" onClick={guardarBorrador}>
+        <button className="bm-btn bm-btn-soft" onClick={guardarBorrador} disabled={enviando}>
           Guardar borrador
         </button>
         <button className="bm-btn bm-btn-primary" onClick={buscar} disabled={enviando}>
@@ -211,18 +262,25 @@ function criterio(valor: string, tipo: TipoCriterio): Criterio {
   return { tipo, valor, obligatorio: false, peso: 1 }
 }
 
+function descripcionMuyCorta(descripcion: string): boolean {
+  const texto = descripcion.trim()
+  return texto.length > 0 && texto.length < DESCRIPCION_MIN
+}
+
 function CampoChips({
   id,
   etiqueta,
   placeholder,
   valores,
   onCambio,
+  deshabilitado,
 }: {
   id: string
   etiqueta: string
   placeholder: string
   valores: string[]
   onCambio: (valores: string[]) => void
+  deshabilitado?: boolean
 }) {
   const agregar = (evento: React.KeyboardEvent<HTMLInputElement>) => {
     if (evento.key !== 'Enter') return
@@ -234,21 +292,27 @@ function CampoChips({
   }
 
   return (
-    <>
+    <div className="bm-field-chips">
       <div className="bm-field">
         <label htmlFor={id}>{etiqueta}</label>
-        <input id={id} placeholder={placeholder} onKeyDown={agregar} />
+        <input id={id} placeholder={placeholder} onKeyDown={agregar} disabled={deshabilitado} />
       </div>
-      <div className="bm-chips">
-        {valores.map((valor) => (
-          <span className="bm-chip" key={valor}>
-            {valor}
-            <button onClick={() => onCambio(valores.filter((v) => v !== valor))} aria-label={`Quitar ${valor}`}>
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-    </>
+      {valores.length > 0 && (
+        <div className="bm-chips">
+          {valores.map((valor) => (
+            <span className="bm-chip" key={valor}>
+              {valor}
+              <button
+                onClick={() => onCambio(valores.filter((v) => v !== valor))}
+                aria-label={`Quitar ${valor}`}
+                disabled={deshabilitado}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

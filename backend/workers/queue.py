@@ -5,7 +5,8 @@ Las operaciones largas no pueden vivir dentro de una petición HTTP: una búsque
 puede tardar hasta 2 minutos y la ingesta inicial decenas (RNF04).
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 from backend.config import REDIS_URL
 
@@ -22,7 +23,12 @@ def get_cola():
         from redis import Redis
         from rq import Queue
 
-        _cola = Queue("beematch", connection=Redis.from_url(REDIS_URL))
+        conexion = Redis.from_url(REDIS_URL, socket_connect_timeout=2)
+        # Redis.from_url no abre la conexión: sin el ping, un Redis caído no se
+        # detecta aquí y el error aparece recién al encolar, tumbando la
+        # sincronización en vez de ejecutar en línea como dice esta función.
+        conexion.ping()
+        _cola = Queue("beematch", connection=conexion)
         return _cola
     except Exception:
         return None

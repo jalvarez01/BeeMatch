@@ -8,6 +8,10 @@ from backend.domain.services.bitacora_service import (
 )
 from backend.domain.services.busqueda_service import BusquedaService
 from backend.domain.services.resultado_service import ResultadoService
+from backend.domain.services.solicitud_service import (
+    MENSAJE_DESCRIPCION_CORTA,
+    descripcion_insuficiente,
+)
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.models.solicitud import ESTADO_EN_ANALISIS
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
@@ -35,11 +39,16 @@ def ejecutar(
     frontend consulta el progreso (RNF04, HU-22).
     """
     solicitudes = SolicitudRepository(db)
-    if not solicitudes.get_by_id(solicitud_id):
+    solicitud = solicitudes.get_by_id(solicitud_id)
+    if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if descripcion_insuficiente(solicitud.descripcion_libre):
+        raise HTTPException(status_code=422, detail=MENSAJE_DESCRIPCION_CORTA)
 
     busqueda_id = BusquedaService(db).encolar(solicitud_id)
     solicitudes.cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
+    # La sincronización con el repositorio (HU-16) la hace el worker, no esta
+    # petición: ver backend/workers/busqueda_worker.py.
     encolar(ejecutar_busqueda, busqueda_id)
 
     BitacoraService(db).registrar(

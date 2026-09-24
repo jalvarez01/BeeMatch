@@ -49,16 +49,26 @@ export default function Candidatos() {
                 ))}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--muted-2)' }}>{candidato.ruta_hoja_vida}</div>
+            {/* La ruta del documento en Drive no le dice nada al reclutador: el
+                enlace del botón ya lleva al archivo. Se deja la celda vacía
+                para no alterar la grilla de la fila. */}
             <div />
-            <a
-              className="bm-btn bm-btn-ghost"
-              href={candidato.url_hoja_vida ?? '#'}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver CV ↗
-            </a>
+            <div />
+            {candidato.url_hoja_vida ? (
+              <a
+                className="bm-btn bm-btn-primary"
+                href={candidato.url_hoja_vida}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver CV
+              </a>
+            ) : (
+              /* Sin enlace no hay a dónde ir: se muestra apagado en vez de un botón muerto. */
+              <span className="bm-btn bm-btn-soft" title="El documento no tiene enlace en el repositorio">
+                Sin enlace
+              </span>
+            )}
           </div>
         ))}
       </div>
