@@ -115,3 +115,52 @@ def origen(monkeypatch):
         estado["resultado"] = resultado
 
     return configurar
+
+
+# --- Autenticación (HU-01, HU-02, HU-03) -------------------------------------
+
+CLAVE_DE_PRUEBA = "Clave12345"
+
+
+@pytest.fixture
+def cliente():
+    """Cliente HTTP sin startup (ver la nota sobre el gestor de contexto arriba)."""
+    from fastapi.testclient import TestClient
+
+    from backend.main import app
+
+    return TestClient(app)
+
+
+@pytest.fixture
+def crear_usuario(db):
+    """Fábrica de usuarios con contraseña conocida (`CLAVE_DE_PRUEBA`)."""
+    from backend.security import hashear_password
+
+    def crear(correo, rol="COORDINADOR", nombre=None, activo=True, pendiente=False):
+        usuario = UsuarioModel(
+            nombre=nombre or correo.split("@")[0],
+            correo=correo,
+            rol=rol,
+            activo=activo,
+            pendiente=pendiente,
+            password_hash=hashear_password(CLAVE_DE_PRUEBA),
+        )
+        db.add(usuario)
+        db.commit()
+        db.refresh(usuario)
+        return usuario
+
+    return crear
+
+
+@pytest.fixture
+def entrar(cliente):
+    """Inicia sesión por la API real y devuelve las cabeceras con el token."""
+
+    def _entrar(correo, password=CLAVE_DE_PRUEBA):
+        respuesta = cliente.post("/auth/login", json={"correo": correo, "password": password})
+        assert respuesta.status_code == 200, respuesta.text
+        return {"Authorization": f"Bearer {respuesta.json()['access_token']}"}
+
+    return _entrar
