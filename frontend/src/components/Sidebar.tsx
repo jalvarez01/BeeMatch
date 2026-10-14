@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { cerrarSesion } from '../api/auth'
+import { leerSesion } from '../api/client'
+import type { Sesion } from '../types'
 
 const NAV = [
   { ruta: '/inicio', etiqueta: 'Inicio' },
@@ -10,11 +12,18 @@ const NAV = [
   { ruta: '/historial', etiqueta: 'Historial' },
 ]
 
+/** HU-03-CP5: el módulo de usuarios solo lo ven quienes administran. */
+const ROLES_QUE_ADMINISTRAN = ['ADMINISTRADOR', 'SUPERADMINISTRADOR']
+
 export default function Sidebar() {
   const navegar = useNavigate()
+  const rol = leerSesion<Sesion>()?.usuario.rol
+  const puedeAdministrar = rol !== undefined && ROLES_QUE_ADMINISTRAN.includes(rol)
+  const menu = puedeAdministrar ? [...NAV, { ruta: '/usuarios', etiqueta: 'Usuarios' }] : NAV
 
-  const salir = () => {
-    cerrarSesion()
+  const salir = async () => {
+    await cerrarSesion()
+    // `replace` saca la pantalla del historial: el botón atrás ya no la muestra.
     navegar('/login', { replace: true })
   }
 
@@ -26,7 +35,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="bm-nav">
-        {NAV.map((item) => (
+        {menu.map((item) => (
           <NavLink key={item.ruta} to={item.ruta}>
             {({ isActive }) => (
               <span data-active={isActive} className="bm-nav-item">
