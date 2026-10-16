@@ -12,14 +12,24 @@ from backend.schemas.solicitud import (
     SolicitudResponse,
     SolicitudUpdate,
 )
-from backend.security import get_current_user
+from backend.security import ROL_DIRECTOR, exigir_rol, get_current_user
 
 router = APIRouter()
 
+def _verificar_acceso_solicitud(solicitud, usuario):
+    if solicitud.usuario_id == usuario.id:
+        return
+
+    if usuario.rol in ("DIRECTOR", "ADMINISTRADOR"):
+        return
+
+    raise HTTPException(
+        status_code=403,
+        detail="No tienes permiso para acceder a esta solicitud.",
+    )
 
 def _service(db: Session = Depends(get_db)) -> SolicitudService:
     return SolicitudService(db)
-
 
 @router.post("/", response_model=SolicitudResponse, status_code=201)
 def crear_solicitud(
@@ -42,7 +52,6 @@ def crear_solicitud(
     )
     return solicitud
 
-
 @router.get("/", response_model=HistorialResponse)
 def historial(
     estado: Optional[str] = None,
@@ -50,47 +59,64 @@ def historial(
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=10, ge=1, le=50),
     svc: SolicitudService = Depends(_service),
-    _=Depends(get_current_user),
+    _=Depends(exigir_rol(ROL_DIRECTOR, "ADMINISTRADOR")),
 ):
     """HU-13: historial filtrable."""
     solicitudes, total = svc.historial(estado, texto, pagina, por_pagina)
     return HistorialResponse(total=total, pagina=pagina, solicitudes=solicitudes)
 
-
 @router.get("/{solicitud_id}", response_model=SolicitudResponse)
 def obtener_solicitud(
     solicitud_id: str,
     svc: SolicitudService = Depends(_service),
-    _=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    solicitud = svc.obtener(solicitud_id)
-    if not solicitud:
-        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
-    return solicitud
+    solicitud_model = svc.repo.get_by_id(solicitud_id)
 
+    if not solicitud_model:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    _verificar_acceso_solicitud(solicitud_model, current_user)
+
+    return svc.obtener(solicitud_id)
 
 @router.put("/{solicitud_id}", response_model=SolicitudResponse)
 def actualizar_solicitud(
     solicitud_id: str,
     datos: SolicitudUpdate,
     svc: SolicitudService = Depends(_service),
-    _=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """HU-15: ajustar criterios antes de una nueva ejecución."""
+    solicitud_model = svc.repo.get_by_id(solicitud_id)
+
+    if not solicitud_model:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    _verificar_acceso_solicitud(solicitud_model, current_user)
+
     solicitud = svc.actualizar(solicitud_id, datos)
+
     if not solicitud:
-        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
     return solicitud
 
-
-@router.post("/{solicitud_id}/duplicar", response_model=SolicitudResponse, status_code=201)
+@router.post("/{solicitud_id}/duplicar", response_model=SolicitudResponse)
 def duplicar_solicitud(
     solicitud_id: str,
     svc: SolicitudService = Depends(_service),
     current_user=Depends(get_current_user),
 ):
-    """HU-14: reutilizar una solicitud anterior con sus criterios precargados."""
+    solicitud_model = svc.repo.get_by_id(solicitud_id)
+
+    if not solicitud_model:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    _verificar_acceso_solicitud(solicitud_model, current_user)
+
     copia = svc.duplicar(solicitud_id, current_user.id)
+
     if not copia:
-        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
     return copia

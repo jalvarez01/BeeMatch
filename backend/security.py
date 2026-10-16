@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_HORAS, JWT_SECRET
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
+from types import SimpleNamespace
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -126,7 +127,6 @@ def decodificar_token(token: str) -> dict:
 
 # --- Dependencias ------------------------------------------------------------
 
-
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
@@ -142,8 +142,25 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo."
         )
-    return usuario
 
+    # El rol del token se mantiene hasta que el usuario inicie sesión de nuevo.
+    rol_sesion = payload.get("rol")
+    if rol_sesion not in ROLES_VALIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido."
+        )
+
+    
+    # Crear una copia independiente para no modificar el objeto de SQLAlchemy.
+    datos_usuario = {
+        columna.name: getattr(usuario, columna.name)
+        for columna in usuario.__table__.columns
+    }
+    usuario_sesion = SimpleNamespace(**datos_usuario)
+
+    # El rol del token se aplica solo a esta sesión.
+    usuario_sesion.rol = rol_sesion
+    return usuario_sesion
 
 def exigir_rol(*roles: str):
     """Restringe un endpoint a ciertos roles (RNF08)."""

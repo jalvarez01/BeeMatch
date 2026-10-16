@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_LOGIN, BitacoraService
 from backend.infrastructure.persistence.database import get_db
+from backend.infrastructure.persistence.models.usuario import UsuarioModel
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from backend.schemas.auth import (
     CambiarPasswordRequest,
@@ -122,7 +123,29 @@ def actualizar_usuario(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    if datos.rol:
+        # Proteger al último administrador activo.
+    es_admin_activo = usuario.activo and usuario.rol == ROL_ADMINISTRADOR
+    pierde_rol_admin = datos.rol is not None and datos.rol != ROL_ADMINISTRADOR
+    se_desactiva = datos.activo is False
+
+    if es_admin_activo and (pierde_rol_admin or se_desactiva):
+        otros_admins_activos = (
+            db.query(UsuarioModel)
+            .filter(
+                UsuarioModel.rol == ROL_ADMINISTRADOR,
+                UsuarioModel.activo.is_(True),
+                UsuarioModel.id != usuario_id,
+            )
+            .count()
+        )
+
+        if otros_admins_activos == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede quitar o desactivar al último administrador activo.",
+            )
+
+    if datos.rol is not None:
         repo.actualizar_rol(usuario_id, datos.rol)
     if datos.activo is False:
         repo.desactivar(usuario_id)
