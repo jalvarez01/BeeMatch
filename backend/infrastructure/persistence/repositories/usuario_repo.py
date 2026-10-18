@@ -30,6 +30,8 @@ class UsuarioRepository:
         password_hash: Optional[str] = None,
         id_entra: Optional[str] = None,
         debe_cambiar_password: bool = False,
+        activo: bool = True,
+        pendiente: bool = False,
     ) -> UsuarioModel:
         usuario = UsuarioModel(
             nombre=nombre,
@@ -38,11 +40,24 @@ class UsuarioRepository:
             password_hash=password_hash,
             id_entra=id_entra,
             debe_cambiar_password=debe_cambiar_password,
+            activo=activo,
+            pendiente=pendiente,
         )
         self.db.add(usuario)
         self.db.commit()
         self.db.refresh(usuario)
         return usuario
+
+    def actualizar(self, usuario: UsuarioModel, **campos) -> UsuarioModel:
+        """Aplica los campos dados (nombre, correo, rol, activo, pendiente)."""
+        for nombre, valor in campos.items():
+            setattr(usuario, nombre, valor.lower() if nombre == "correo" else valor)
+        self.db.commit()
+        self.db.refresh(usuario)
+        return usuario
+
+    def existe_rol(self, rol: str) -> bool:
+        return self.db.query(UsuarioModel).filter(UsuarioModel.rol == rol).first() is not None
 
     def actualizar_password(self, usuario: UsuarioModel, password_hash: str) -> UsuarioModel:
         usuario.password_hash = password_hash

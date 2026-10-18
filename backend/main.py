@@ -46,6 +46,7 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 def on_startup():
     init_db()
     _sembrar_parametros()
+    _sembrar_superusuario()
     _sembrar_repositorio()
 
     # El planificador solo arranca si APScheduler está instalado y hay un
@@ -92,6 +93,48 @@ def _sembrar_parametros():
         for clave, valor in defaults.items():
             if not repo.get(clave):
                 repo.establecer(clave, valor)
+    finally:
+        db.close()
+
+
+def _sembrar_superusuario():
+    """
+    Crea a la superusuaria (HU-03) si todavía no existe ninguna.
+
+    Si el correo configurado ya pertenece a una cuenta, esa cuenta se asciende en
+    lugar de duplicarla. Cuando ya hay una superusuaria no se toca nada: el rol
+    no se cambia desde la aplicación, así que esta es la única vía de alta.
+    """
+    from backend.config import SUPERUSUARIO_CORREO, SUPERUSUARIO_NOMBRE, SUPERUSUARIO_PASSWORD
+    from backend.infrastructure.persistence.database import SessionLocal
+    from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
+    from backend.security import ROL_SUPERADMINISTRADOR, hashear_password
+
+    if not SUPERUSUARIO_CORREO:
+        return
+
+    db = SessionLocal()
+    try:
+        repo = UsuarioRepository(db)
+        if repo.existe_rol(ROL_SUPERADMINISTRADOR):
+            return
+
+        existente = repo.get_by_correo(SUPERUSUARIO_CORREO)
+        if existente:
+            repo.actualizar(existente, rol=ROL_SUPERADMINISTRADOR, activo=True, pendiente=False)
+            logger.info("Cuenta existente ascendida a SUPERADMINISTRADOR.")
+        elif SUPERUSUARIO_PASSWORD:
+            repo.crear(
+                nombre=SUPERUSUARIO_NOMBRE,
+                correo=SUPERUSUARIO_CORREO,
+                rol=ROL_SUPERADMINISTRADOR,
+                password_hash=hashear_password(SUPERUSUARIO_PASSWORD),
+            )
+            logger.info("Superusuaria creada.")
+        else:
+            logger.warning("SUPERUSUARIO_CORREO sin SUPERUSUARIO_PASSWORD: no se creó la superusuaria.")
+    except Exception:
+        logger.exception("No se pudo sembrar a la superusuaria.")
     finally:
         db.close()
 

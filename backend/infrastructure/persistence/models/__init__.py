@@ -20,4 +20,4 @@ from backend.infrastructure.persistence.models.hoja_vida import (  # noqa: F401
     HojaDeVidaModel,
 )
 from backend.infrastructure.persistence.models.solicitud import CriterioModel, SolicitudModel  # noqa: F401
-from backend.infrastructure.persistence.models.usuario import UsuarioModel  # noqa: F401
+from backend.infrastructure.persistence.models.usuario import IntentoLoginModel, UsuarioModel  # noqa: F401

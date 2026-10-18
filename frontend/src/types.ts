@@ -1,6 +1,6 @@
 /** Tipos compartidos. Espejan los schemas de Pydantic del backend. */
 
-export type Rol = 'COORDINADOR' | 'DIRECTOR' | 'ADMINISTRADOR'
+export type Rol = 'COORDINADOR' | 'DIRECTOR' | 'ADMINISTRADOR' | 'SUPERADMINISTRADOR'
 
 export type EstadoSolicitud = 'BORRADOR' | 'EN_ANALISIS' | 'PROCESADA' | 'ERROR'
 
@@ -23,6 +23,7 @@ export interface Usuario {
   correo: string
   rol: Rol
   activo: boolean
+  pendiente?: boolean
 }
 
 export interface Sesion {
