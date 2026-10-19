@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import (
@@ -24,7 +24,7 @@ from backend.schemas.busqueda import (
 from backend.schemas.hoja_vida import DisponibilidadHojaVidaResponse
 from backend.security import get_current_user
 from backend.workers.busqueda_worker import ejecutar_busqueda
-from backend.workers.queue import encolar
+from backend.workers.queue import despachar
 
 router = APIRouter()
 
@@ -32,6 +32,7 @@ router = APIRouter()
 @router.post("/solicitud/{solicitud_id}", response_model=BusquedaEstadoResponse, status_code=202)
 def ejecutar(
     solicitud_id: str,
+    tareas: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -46,11 +47,19 @@ def ejecutar(
     if descripcion_insuficiente(solicitud.descripcion_libre):
         raise HTTPException(status_code=422, detail=MENSAJE_DESCRIPCION_CORTA)
 
-    busqueda_id = BusquedaService(db).encolar(solicitud_id)
+    servicio = BusquedaService(db)
+
+    # HU-22: si la solicitud ya se está analizando no se lanza otra búsqueda
+    # encima (doble clic, dos pestañas): se devuelve la que está en curso.
+    en_curso = servicio.en_curso(solicitud_id)
+    if en_curso:
+        return BusquedaEstadoResponse.model_validate(en_curso)
+
+    busqueda_id = servicio.encolar(solicitud_id)
     solicitudes.cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
     # La sincronización con el repositorio (HU-16) la hace el worker, no esta
     # petición: ver backend/workers/busqueda_worker.py.
-    encolar(ejecutar_busqueda, busqueda_id)
+    despachar(tareas, ejecutar_busqueda, busqueda_id)
 
     BitacoraService(db).registrar(
         ACCION_BUSQUEDA_EJECUTADA,
@@ -59,7 +68,7 @@ def ejecutar(
         entidad_id=busqueda_id,
     )
 
-    busqueda = BusquedaService(db).busquedas.get_by_id(busqueda_id)
+    busqueda = servicio.busquedas.get_by_id(busqueda_id)
     return BusquedaEstadoResponse.model_validate(busqueda)
 
 

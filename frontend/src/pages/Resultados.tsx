@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { esperarResultado, marcarPreseleccion, obtenerResultados } from '../api/busquedas'
+import {
+  esperaCancelada,
+  esperarResultado,
+  etapaPorDefecto,
+  marcarPreseleccion,
+  obtenerResultados,
+} from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
 import { AfinidadBadge, Tag } from '../components/Badges'
@@ -21,31 +27,49 @@ export default function Resultados() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
+  // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
+  // análisis anterior en vez de dejarlo corriendo en segundo plano.
+  const control = useRef<AbortController | null>(null)
+
   const cargar = useCallback(async () => {
+    control.current?.abort()
+    const actual = new AbortController()
+    control.current = actual
+
     setCargando(true)
     setError('')
+    setEtapa('Preparando la consulta')
+    setProgreso(0)
     try {
       const inicial = await obtenerResultados(busquedaId)
 
       const final =
         inicial.estado === 'COMPLETADA'
           ? inicial
-          : await esperarResultado(busquedaId, (estado) => {
-              setEtapa(estado.etapa ?? 'Analizando')
-              setProgreso(estado.progreso)
-            })
+          : await esperarResultado(
+              busquedaId,
+              (estado) => {
+                setEtapa(estado.etapa ?? etapaPorDefecto(estado.estado))
+                setProgreso(estado.progreso)
+              },
+              { signal: actual.signal },
+            )
 
+      const solicitudDeLaBusqueda = await obtenerSolicitud(final.solicitud_id)
+      if (actual.signal.aborted) return
       setResultado(final)
-      setSolicitud(await obtenerSolicitud(final.solicitud_id))
+      setSolicitud(solicitudDeLaBusqueda)
     } catch (e) {
+      if (esperaCancelada(e) || actual.signal.aborted) return
       setError((e as Error).message)
     } finally {
-      setCargando(false)
+      if (!actual.signal.aborted) setCargando(false)
     }
   }, [busquedaId])
 
   useEffect(() => {
     void cargar()
+    return () => control.current?.abort()
   }, [cargar])
 
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {

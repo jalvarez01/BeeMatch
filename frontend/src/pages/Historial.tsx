@@ -26,6 +26,8 @@ export default function Historial() {
   const [texto, setTexto] = useState('')
   const [pagina, setPagina] = useState(1)
   const [error, setError] = useState('')
+  // HU-22: id de la solicitud que se está reintentando; bloquea otro clic mientras tanto.
+  const [reintentando, setReintentando] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     setError('')
@@ -52,8 +54,16 @@ export default function Historial() {
   }
 
   const reejecutar = async (solicitudId: string) => {
-    const busqueda = await ejecutarBusqueda(solicitudId)
-    navegar(`/resultados/${busqueda.id}`)
+    if (reintentando) return
+    setError('')
+    setReintentando(solicitudId)
+    try {
+      const busqueda = await ejecutarBusqueda(solicitudId)
+      navegar(`/resultados/${busqueda.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+      setReintentando(null)
+    }
   }
 
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
@@ -173,8 +183,13 @@ export default function Historial() {
               )}
 
               {solicitud.estado === 'ERROR' && (
-                <button className="bm-btn bm-btn-ghost" onClick={() => void reejecutar(solicitud.id)}>
-                  Reintentar →
+                <button
+                  className="bm-btn bm-btn-ghost"
+                  onClick={() => void reejecutar(solicitud.id)}
+                  disabled={reintentando !== null}
+                  aria-busy={reintentando === solicitud.id}
+                >
+                  {reintentando === solicitud.id ? 'Analizando…' : 'Reintentar →'}
                 </button>
               )}
             </div>

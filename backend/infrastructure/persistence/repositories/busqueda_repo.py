@@ -1,8 +1,11 @@
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models.busqueda import (
+    BUSQUEDA_EJECUTANDO,
+    BUSQUEDA_EN_COLA,
     BusquedaModel,
     CoincidenciaModel,
     PreseleccionModel,
@@ -47,6 +50,25 @@ class BusquedaRepository:
         return (
             self.db.query(BusquedaModel)
             .filter(BusquedaModel.solicitud_id == solicitud_id)
+            .order_by(BusquedaModel.created_at.desc())
+            .first()
+        )
+
+    def en_curso_de_solicitud(self, solicitud_id: str, desde: datetime) -> Optional[BusquedaModel]:
+        """
+        Búsqueda de la solicitud que sigue pendiente o ejecutándose (HU-22).
+
+        `desde` descarta las abandonadas: si un worker muere a mitad de camino la
+        búsqueda queda EJECUTANDO para siempre y, sin este corte, la solicitud no
+        se podría volver a analizar.
+        """
+        return (
+            self.db.query(BusquedaModel)
+            .filter(
+                BusquedaModel.solicitud_id == solicitud_id,
+                BusquedaModel.estado.in_([BUSQUEDA_EN_COLA, BUSQUEDA_EJECUTANDO]),
+                BusquedaModel.created_at >= desde,
+            )
             .order_by(BusquedaModel.created_at.desc())
             .first()
         )
