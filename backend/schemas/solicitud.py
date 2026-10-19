@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 TipoCriterio = Literal["TECNOLOGIA", "FRAMEWORK", "DOMINIO", "CERTIFICACION", "IDIOMA"]
 DESCRIPCION_MIN_CARACTERES = 15
 DESCRIPCION_MAX_CARACTERES = 1000
+EXPERIENCIA_MAX_ANIOS = 50
 
 class CriterioBase(BaseModel):
     tipo: TipoCriterio
@@ -25,7 +26,8 @@ class SolicitudCreate(BaseModel):
 
     descripcion_libre: str = Field(default="", max_length=DESCRIPCION_MAX_CARACTERES)
     rol_buscado: Optional[str] = None
-    experiencia_min: Optional[int] = Field(default=None, ge=0, le=50)
+    # HU-10: los años de experiencia solo admiten enteros positivos.
+    experiencia_min: Optional[int] = Field(default=None, gt=0, le=EXPERIENCIA_MAX_ANIOS)
     cliente: Optional[str] = None
     proyecto: Optional[str] = None
     criterios: list[CriterioBase] = []
@@ -35,7 +37,7 @@ class SolicitudCreate(BaseModel):
 class SolicitudUpdate(BaseModel):
     descripcion_libre: Optional[str] = Field(default=None, max_length=DESCRIPCION_MAX_CARACTERES)
     rol_buscado: Optional[str] = None
-    experiencia_min: Optional[int] = None
+    experiencia_min: Optional[int] = Field(default=None, gt=0, le=EXPERIENCIA_MAX_ANIOS)
     cliente: Optional[str] = None
     proyecto: Optional[str] = None
     criterios: Optional[list[CriterioBase]] = None

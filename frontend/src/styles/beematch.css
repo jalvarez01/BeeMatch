@@ -119,6 +119,7 @@
   color: var(--muted); flex: 1; min-width: 0;
 }
 .bm-field input:focus, .bm-field select:focus { outline: none; color: var(--ink); }
+.bm-field[data-error='true'] { border-color: var(--red); }
 .bm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Ajustes visuales de selects, chips y textarea */
@@ -281,3 +282,12 @@
 .bm-archivo input[type='file']::file-selector-button:hover { border-color: #C9CDD4; }
 .bm-archivo .ok { font-size: 12px; color: var(--green-tx); }
 .bm-archivo .err { font-size: 12px; color: var(--red); }
+/* ---------- acceso y usuarios (HU-01, HU-02, HU-03) ---------- */
+.bm-aviso { color: var(--ink-soft); background: #FDF0D0; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-top: 14px; }
+.bm-login-form .foot a { color: var(--ink); font-weight: 600; text-decoration: underline; }
+.bm-exito { color: var(--green-tx); background: var(--green-bg); border-radius: 8px; padding: 10px 12px; font-size: 12px; margin-top: 14px; text-align: left; }
+.bm-user-row { display: grid; grid-template-columns: 1.6fr 1.2fr auto auto; gap: 16px; align-items: center; padding: 14px 4px; }
+.bm-user-row + .bm-user-row { border-top: 1px solid var(--line); }
+.bm-user-row select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; background: var(--white); }
+.bm-user-acciones { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 860px) { .bm-user-row { grid-template-columns: 1fr; } .bm-user-acciones { justify-content: flex-start; } }
