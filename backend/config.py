@@ -45,11 +45,11 @@ GDRIVE_ARCHIVO_CREDENCIALES = Path(
 GDRIVE_CARPETA_ID = os.getenv("GDRIVE_CARPETA_ID", "1H7-p-d3auJOzrw660zGfmKa5drW0Hn_V")
 
 # --- Servicio de IA (RNF33: configurable sin recompilar) ---------------------
-# Son dos proveedores distintos y cada uno lleva su clave: Anthropic no ofrece
-# API de embeddings, así que el re-ranking va contra Claude y la vectorización
-# contra el endpoint de embeddings de OpenAI.
+# El proveedor es OpenAI para todo: el re-ranking y la explicación (etapa 3) y
+# la vectorización de CV y consultas. Cada uso lleva su variable de clave para
+# poder separar proyectos o cupos, pero puede ser la misma clave.
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODELO = os.getenv("LLM_MODELO", "claude-opus-5")
+LLM_MODELO = os.getenv("LLM_MODELO", "gpt-4o-mini")
 
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 EMBEDDING_MODELO = os.getenv("EMBEDDING_MODELO", "text-embedding-3-small")
@@ -73,6 +73,23 @@ JWT_SECRET = os.getenv("JWT_SECRET", "beematch-dev-secret-cambiar-en-produccion"
 # Debe ser una clave Fernet válida. Si se omite, se deriva del JWT_SECRET.
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRACION_HORAS = int(os.getenv("JWT_EXPIRACION_HORAS", "8"))
+
+# HU-02: la sesión se cierra tras 30 minutos sin actividad. El token dura lo
+# mismo y el navegador lo renueva mientras el usuario trabaja, así el servidor
+# también rechaza un token copiado que lleva media hora sin usarse.
+JWT_EXPIRACION_MINUTOS = int(os.getenv("JWT_EXPIRACION_MINUTOS", "30"))
+
+# HU-01: tras LOGIN_MAX_INTENTOS fallos seguidos el acceso se bloquea.
+LOGIN_MAX_INTENTOS = int(os.getenv("LOGIN_MAX_INTENTOS", "5"))
+LOGIN_BLOQUEO_MINUTOS = int(os.getenv("LOGIN_BLOQUEO_MINUTOS", "15"))
+
+# HU-03: el autorregistro solo acepta correos corporativos de este dominio.
+DOMINIO_CORREO = os.getenv("DOMINIO_CORREO", "bee.com.co").lower()
+
+# HU-03: superusuaria (Diana). Si no existe ninguna al arrancar y el correo y la
+# contraseña están definidos, se crea con el rol SUPERADMINISTRADOR.
+SUPERUSUARIO_CORREO = os.getenv("SUPERUSUARIO_CORREO", "").strip().lower()
+SUPERUSUARIO_NOMBRE = os.getenv("SUPERUSUARIO_NOMBRE", "Diana")
+SUPERUSUARIO_PASSWORD = os.getenv("SUPERUSUARIO_PASSWORD", "")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")

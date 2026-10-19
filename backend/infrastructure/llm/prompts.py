@@ -59,3 +59,51 @@ def construir_prompt_rerank(perfil: str, requisitos: list[str], candidatos: list
         requisitos="\n".join(f"- {r}" for r in requisitos),
         candidatos="\n\n".join(bloques),
     )
+
+
+# --- Extracción del perfil estructurado (RF02, HU-18) ------------------------
+# El re-ranking explica por qué un candidato encaja; esto es lo anterior: sacar
+# del texto del CV los datos que la tarjeta de resultados muestra (rol, años y
+# tecnologías). Se ejecuta una vez por documento, en la indexación, no en el
+# camino crítico de la búsqueda.
+
+SYSTEM_EXTRACCION = """Eres un asistente que extrae datos estructurados de hojas de vida para una empresa de Staff Augmentation del sector financiero.
+
+Reglas estrictas:
+1. Solo puedes extraer lo que aparece explícitamente en el texto. No infieras ni completes.
+2. Si un dato no aparece, su valor es null. Una lista sin datos es una lista vacía.
+3. Los años de experiencia son un entero. Si el documento no los declara pero sí lista un historial laboral con fechas, calcula el total de años trabajados. Si no hay forma de saberlo, es null.
+4. El rol principal es el cargo con el que la persona se presenta o el más reciente de su historial, en una frase corta (por ejemplo "Desarrollador Backend Java").
+5. En tecnologías incluye lenguajes, frameworks, bases de datos, herramientas, plataformas y certificaciones. Usa el nombre canónico y sin número de versión: "Java", no "Java 17" ni "Java 11"; "PostgreSQL", no "postgre". Si la misma tecnología aparece con versiones distintas, nómbrala una sola vez. Cada una debe citar el fragmento del texto donde aparece.
+6. No extraigas ni consideres edad, género, nacionalidad, estado civil, foto, documento de identidad ni datos de contacto. Si aparecen, ignóralos.
+
+Respondes únicamente con JSON válido, sin texto adicional ni marcas de código."""
+
+PLANTILLA_EXTRACCION = """TEXTO DE LA HOJA DE VIDA
+{texto}
+
+Devuelve un JSON con esta forma exacta:
+{{
+  "nombre": "nombre completo de la persona, o null",
+  "rol_principal": "cargo principal, o null",
+  "anios_experiencia": 0,
+  "ubicacion": "ciudad o país, o null",
+  "resumen": "dos frases sobre el perfil profesional",
+  "tecnologias": [
+    {{
+      "nombre": "nombre canónico de la tecnología",
+      "categoria": "TECNOLOGIA | FRAMEWORK | BASE_DATOS | HERRAMIENTA | CERTIFICACION | DOMINIO",
+      "anios_experiencia": null,
+      "evidencia_texto": "cita breve del texto donde aparece"
+    }}
+  ]
+}}"""
+
+# Tope de texto que se le manda al modelo. Una hoja de vida típica son 2 a 4
+# páginas; este techo cubre las largas y acota el costo de la ingesta inicial,
+# que procesa el repositorio entero.
+MAX_CARACTERES_EXTRACCION = 12000
+
+
+def construir_prompt_extraccion(texto: str) -> str:
+    return PLANTILLA_EXTRACCION.format(texto=texto[:MAX_CARACTERES_EXTRACCION])

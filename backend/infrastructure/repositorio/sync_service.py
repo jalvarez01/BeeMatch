@@ -2,12 +2,15 @@
 Sincronización con el repositorio configurado (componente C7).
 
 RF01: no duplica ni migra información. Registra la referencia del documento y
-encola para indexación solo lo que cambió (RD5).
+encola para indexación solo lo que cambió (RD5). Lo que desapareció del origen
+se da de baja, para que no siga saliendo en las búsquedas (HU-16).
 
 El origen es siempre el que el administrador configuró (HU-05) —OneDrive o
 Google Drive—, no una variable de entorno. Este servicio trabaja contra la
 interfaz RepositorioDocumentos y no conoce al proveedor.
 """
+
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +20,8 @@ from backend.infrastructure.persistence.repositories.configuracion_repo import (
     RepositorioConfigRepository,
 )
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
+
+logger = logging.getLogger(__name__)
 
 
 class SincronizacionService:
@@ -38,7 +43,9 @@ class SincronizacionService:
         documentos, nuevo_cursor = cliente.listar_documentos(cursor_previo)
 
         a_indexar: list[str] = []
+        presentes: set[str] = set()
         for documento in documentos:
+            presentes.add(documento.id_documento)
             hoja, necesita_reindexar = self.repo.registrar_o_actualizar(
                 {
                     "id_documento": documento.id_documento,
@@ -64,6 +71,8 @@ class SincronizacionService:
             if necesita_reindexar or hoja.estado_procesamiento == ESTADO_PENDIENTE:
                 a_indexar.append(hoja.id)
 
+        eliminadas = self._dar_de_baja_ausentes(presentes, cursor_previo, len(documentos))
+
         # Los orígenes sin delta (Google Drive) devuelven None: se conserva el
         # cursor anterior en lugar de borrarlo.
         if nuevo_cursor:
@@ -72,4 +81,38 @@ class SincronizacionService:
         return {
             "documentos_detectados": len(documentos),
             "hojas_a_indexar": a_indexar,
+            "hojas_eliminadas": eliminadas,
         }
+
+    def _dar_de_baja_ausentes(
+        self, presentes: set[str], cursor_previo: str | None, total_listado: int
+    ) -> int:
+        """
+        Olvida las hojas de vida cuyo documento ya no está en el origen (HU-16).
+
+        Si Bee retira una hoja de vida de la carpeta, normalmente es porque la
+        persona pidió no ser considerada o porque el dato caducó: seguir
+        recomendándola sería lo contrario de lo pedido. Se borra la referencia y
+        todo lo derivado —fragmentos, candidato y habilidades—, que es lo mismo
+        que hace el derecho de supresión (RNF16).
+
+        Dos salvaguardas, porque un borrado no se deshace:
+
+        1. Solo con listado completo. Si se pidió un listado incremental —hay
+           cursor previo, como el delta link de OneDrive—, lo que no vino no es
+           lo que se borró, es lo que no cambió.
+        2. Nunca con listado vacío. Que el origen no devuelva nada se parece
+           mucho más a una carpeta mal configurada o a una falla del proveedor
+           que a que hayan borrado todas las hojas de vida a la vez.
+        """
+        if cursor_previo is not None or total_listado == 0:
+            return 0
+
+        ausentes = self.repo.listar_ausentes(presentes)
+        for hoja in ausentes:
+            logger.info(
+                "La hoja de vida %s ya no está en el origen: se da de baja.", hoja.nombre_archivo
+            )
+            self.repo.eliminar_indice(hoja.id)
+            self.repo.eliminar(hoja.id)
+        return len(ausentes)

@@ -22,3 +22,13 @@ export async function obtenerCandidato(id: string): Promise<CandidatoDetalle> {
 export async function listarCandidatos(pagina = 1): Promise<CandidatoDetalle[]> {
   return apiFetch<CandidatoDetalle[]>(`/candidatos/?pagina=${pagina}`)
 }
+
+export interface RolDisponible {
+  nombre: string
+  candidatos: number
+}
+
+/** Roles que la IA identificó en las hojas de vida indexadas (HU-09). */
+export async function listarRoles(): Promise<RolDisponible[]> {
+  return apiFetch<RolDisponible[]>('/candidatos/roles')
+}

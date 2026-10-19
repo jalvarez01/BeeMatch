@@ -21,8 +21,8 @@ from backend.infrastructure.persistence.database import SessionLocal, init_db
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from backend.security import (
     LONGITUD_MINIMA_PASSWORD,
-    ROLES_VALIDOS,
     ROL_ADMINISTRADOR,
+    ROLES_VALIDOS,
     hashear_password,
 )
 

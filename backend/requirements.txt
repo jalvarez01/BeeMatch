@@ -6,6 +6,11 @@ sqlalchemy==2.0.35
 python-dotenv==1.0.1
 pyjwt==2.9.0
 
+# Cifrado de las credenciales del repositorio en base de datos (HU-05, RNF10).
+# Fernet sale de aquí: hoy llega como dependencia transitiva de otros
+# paquetes, pero el cifrado no puede depender de eso.
+cryptography==50.0.1
+
 # Base de datos
 psycopg[binary]==3.2.3
 pgvector==0.3.5
@@ -17,15 +22,16 @@ apscheduler==3.10.4
 
 # OneDrive / Microsoft Graph
 httpx==0.27.2
-msal==1.31.0
+msal==1.39.0
 
 # Google Drive (origen alternativo): solo la firma del JWT de la cuenta de
 # servicio. Las llamadas REST van con httpx, igual que las de Graph.
 google-auth==2.35.0
 
-# Servicio de IA. Claude (re-ranking y explicación) va por el SDK oficial;
-# los embeddings son de otro proveedor y van con httpx.
-anthropic==1.6.0
+# Servicio de IA. El re-ranking y la explicación (etapa 3) van por el SDK
+# oficial de OpenAI; los embeddings son del mismo proveedor pero van con httpx
+# (ver infrastructure/llm/embeddings.py).
+openai==3.17.0
 
 # Procesamiento de documentos
 pypdf[crypto]==5.0.1

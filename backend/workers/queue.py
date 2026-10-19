@@ -5,7 +5,8 @@ Las operaciones largas no pueden vivir dentro de una petición HTTP: una búsque
 puede tardar hasta 2 minutos y la ingesta inicial decenas (RNF04).
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 from backend.config import REDIS_URL
 

@@ -1,0 +1,55 @@
+# Configuración de Ruff (linter y formateador de Python).
+#
+# Ruff aplica PEP 8, que es el estándar de nombramiento y estilo que adoptó el
+# proyecto. Aquí solo se declara lo que se aparta del comportamiento por defecto
+# y por qué.
+
+# 110 y no los 88 de la guía: el dominio está en español y los nombres del
+# negocio son largos (`reemplazar_habilidades`, `ESTADO_NO_PROCESABLE`), así que
+# 88 obligaría a partir líneas que se leen mejor enteras. 110 deja pasar el
+# código existente y sigue evitando la línea kilométrica.
+line-length = 110
+target-version = "py312"
+
+# Los .pyc versionados de arrastre y el entorno virtual no son código nuestro.
+extend-exclude = [".venv", "**/__pycache__", "frontend"]
+
+[lint]
+select = [
+    "E",    # pycodestyle: los errores de estilo de PEP 8
+    "W",    # pycodestyle: avisos (espacios al final, línea final ausente)
+    "F",    # pyflakes: importaciones sin usar, variables sin definir, f-strings vacíos
+    "I",    # isort: orden de las importaciones
+    "B",    # flake8-bugbear: errores reales disfrazados de estilo
+    "UP",   # pyupgrade: sintaxis anticuada para la versión de Python del proyecto
+]
+
+ignore = [
+    # `Optional[str]` frente a `str | None`. Las dos formas son correctas y el
+    # proyecto usa Optional de forma consistente en modelos, esquemas y
+    # repositorios; cambiar 200 anotaciones no arregla nada y ensucia el
+    # historial de todos.
+    "UP045",
+]
+
+[lint.flake8-bugbear]
+# `Depends(...)` en el valor por defecto es LA forma de inyectar dependencias en
+# FastAPI, no el descuido que B008 persigue. Sin esto, el linter marca los 88
+# parámetros de los routers.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.File",
+    "fastapi.Form",
+    # Mismo caso: `exigir_rol(ROL_ADMINISTRADOR)` construye la dependencia que
+    # FastAPI resuelve por petición (RNF08).
+    "backend.security.exigir_rol",
+]
+
+[lint.per-file-ignores]
+# Las pruebas importan `backend.infrastructure.persistence.models` solo para
+# registrar las tablas en el metadata: es un efecto de importación, no un uso.
+"tests/*" = ["F401"]

@@ -1,3 +1,4 @@
+import unicodedata
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -50,6 +51,42 @@ class CandidatoRepository:
 
     def contar(self) -> int:
         return self.db.query(CandidatoModel).count()
+
+    def listar_roles(self) -> list[tuple[str, int]]:
+        """
+        Roles presentes en el repositorio, del más frecuente al menos, con
+        cuántos candidatos tiene cada uno.
+
+        Sale de lo que la IA extrajo de las hojas de vida, no de una lista
+        fija: cuando Bee cargue perfiles de un área nueva, el filtro los
+        ofrece solo. Las variantes de escritura del mismo rol se agrupan
+        ("FullStack Developer" y "Fullstack Developer" son uno), y se muestra
+        la forma más usada.
+        """
+        filas = (
+            self.db.query(CandidatoModel.rol_principal)
+            .filter(CandidatoModel.rol_principal.isnot(None))
+            .all()
+        )
+
+        grupos: dict[str, dict[str, int]] = {}
+        for (rol,) in filas:
+            rol = (rol or "").strip()
+            if not rol:
+                continue
+            grupos.setdefault(_clave_rol(rol), {}).setdefault(rol, 0)
+            grupos[_clave_rol(rol)][rol] += 1
+
+        roles = []
+        for variantes in grupos.values():
+            total = sum(variantes.values())
+            # La forma que más veces aparece representa al grupo; con empate,
+            # la primera alfabéticamente, para que el orden sea estable.
+            representante = sorted(variantes.items(), key=lambda v: (-v[1], v[0]))[0][0]
+            roles.append((representante, total))
+
+        roles.sort(key=lambda r: (-r[1], r[0]))
+        return roles
 
     # --- Habilidades ---------------------------------------------------------
 
@@ -104,3 +141,11 @@ class CandidatoRepository:
 
     def get_fragmento(self, fragmento_id: str) -> Optional[FragmentoCVModel]:
         return self.db.get(FragmentoCVModel, fragmento_id)
+
+
+def _clave_rol(rol: str) -> str:
+    """Agrupa variantes del mismo rol: ignora mayúsculas, tildes y espacios."""
+    sin_tildes = "".join(
+        c for c in unicodedata.normalize("NFKD", rol) if not unicodedata.combining(c)
+    )
+    return " ".join(sin_tildes.casefold().split())

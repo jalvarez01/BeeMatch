@@ -5,9 +5,9 @@ Solo se le entregan los fragmentos de los finalistas, no el repositorio entero:
 ~30.000 tokens por búsqueda en lugar de ~300.000 (RNF02).
 """
 
+from backend.domain.matching.scorer import nivel_de, normalizar_puntaje
 from backend.infrastructure.llm.llm_provider import ProveedorLLM, RespuestaIA
 from backend.infrastructure.llm.prompts import SYSTEM_RERANK, construir_prompt_rerank
-from backend.domain.matching.scorer import nivel_de, normalizar_puntaje
 
 ESTADOS_VALIDOS = {"ENCONTRADO", "PARCIAL", "NO_EVIDENCIADO"}
 

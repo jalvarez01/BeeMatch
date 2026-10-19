@@ -22,6 +22,24 @@ def init_db():
             conn.commit()
 
     Base.metadata.create_all(bind=engine)
+    _agregar_columnas_faltantes()
+
+
+# Columnas añadidas después de crear las tablas. `create_all` no altera tablas
+# existentes, y una base ya poblada (HU-03: `usuarios.pendiente`) las perdería.
+_COLUMNAS_NUEVAS = {"usuarios": {"pendiente": "BOOLEAN NOT NULL DEFAULT FALSE"}}
+
+
+def _agregar_columnas_faltantes():
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for tabla, columnas in _COLUMNAS_NUEVAS.items():
+            existentes = {c["name"] for c in inspector.get_columns(tabla)}
+            for nombre, definicion in columnas.items():
+                if nombre not in existentes:
+                    conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {definicion}"))
 
 
 def get_db():

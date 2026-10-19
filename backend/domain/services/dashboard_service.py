@@ -1,6 +1,6 @@
 """Métricas de la pantalla de inicio."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -75,8 +75,8 @@ class DashboardService:
         if not fecha:
             return ""
         if fecha.tzinfo is None:
-            fecha = fecha.replace(tzinfo=timezone.utc)
-        delta = datetime.now(timezone.utc) - fecha
+            fecha = fecha.replace(tzinfo=UTC)
+        delta = datetime.now(UTC) - fecha
         horas = int(delta.total_seconds() // 3600)
         if horas < 1:
             return "hace unos minutos"
