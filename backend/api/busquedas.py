@@ -17,6 +17,7 @@ from backend.schemas.busqueda import (
     PreseleccionToggle,
     RecomendacionResponse,
 )
+from backend.schemas.hoja_vida import DisponibilidadHojaVidaResponse
 from backend.security import get_current_user
 from backend.workers.busqueda_worker import ejecutar_busqueda
 from backend.workers.queue import encolar
@@ -81,6 +82,18 @@ def detalle(recomendacion_id: str, db: Session = Depends(get_db), _=Depends(get_
     if not recomendacion:
         raise HTTPException(status_code=404, detail="Recomendación no encontrada")
     return recomendacion
+
+
+@router.get(
+    "/recomendacion/{recomendacion_id}/hoja-de-vida",
+    response_model=DisponibilidadHojaVidaResponse,
+)
+def hoja_de_vida(recomendacion_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """HU-21: ubicación de la hoja de vida y si el archivo sigue disponible."""
+    disponibilidad = ResultadoService(db).disponibilidad_hoja_vida(recomendacion_id)
+    if not disponibilidad:
+        raise HTTPException(status_code=404, detail="Hoja de vida no encontrada")
+    return disponibilidad
 
 
 @router.patch("/recomendacion/{recomendacion_id}/preseleccion", response_model=RecomendacionResponse)

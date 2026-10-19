@@ -1,4 +1,9 @@
-import type { BusquedaEstado, BusquedaResultado, Recomendacion } from '../types'
+import type {
+  BusquedaEstado,
+  BusquedaResultado,
+  DisponibilidadHojaVida,
+  Recomendacion,
+} from '../types'
 import { apiFetch } from './client'
 
 export async function ejecutarBusqueda(solicitudId: string): Promise<BusquedaEstado> {
@@ -15,6 +20,11 @@ export async function obtenerResultados(busquedaId: string): Promise<BusquedaRes
 
 export async function obtenerRecomendacion(recomendacionId: string): Promise<Recomendacion> {
   return apiFetch<Recomendacion>(`/busquedas/recomendacion/${recomendacionId}`)
+}
+
+/** HU-21: consulta al repositorio si la hoja de vida sigue disponible. */
+export async function consultarHojaDeVida(recomendacionId: string): Promise<DisponibilidadHojaVida> {
+  return apiFetch<DisponibilidadHojaVida>(`/busquedas/recomendacion/${recomendacionId}/hoja-de-vida`)
 }
 
 export async function marcarPreseleccion(

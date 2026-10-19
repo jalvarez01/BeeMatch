@@ -4,9 +4,14 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from backend.domain.services.hoja_vida_service import ruta_hoja_vida
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
-from backend.schemas.candidato import CandidatoResponse, HabilidadResponse
+from backend.schemas.candidato import (
+    CandidatoResponse,
+    HabilidadResponse,
+    RolDisponibleResponse,
+)
 
 
 class CandidatoService:
@@ -31,14 +36,55 @@ class CandidatoService:
             for habilidad, relacion in self.repo.listar_habilidades(candidato_id)
         ]
 
-        hoja = self.hojas.get_by_id(candidato.hoja_de_vida_id)
-        if hoja:
-            respuesta.nombre_archivo = hoja.nombre_archivo
-            respuesta.ruta_hoja_vida = f"{hoja.ruta}/{hoja.nombre_archivo}".replace("//", "/")
-            respuesta.url_hoja_vida = hoja.url_web
-
+        self._adjuntar_hoja(
+            respuesta,
+            self.hojas.get_by_id(candidato.hoja_de_vida_id),
+        )
         return respuesta
 
-    def listar(self, pagina: int = 1, por_pagina: int = 20) -> list[CandidatoResponse]:
-        candidatos = self.repo.listar(limite=por_pagina, desplazamiento=(pagina - 1) * por_pagina)
-        return [CandidatoResponse.model_validate(c) for c in candidatos]
+    @staticmethod
+    def _adjuntar_hoja(respuesta: CandidatoResponse, hoja) -> None:
+        """
+        Referencia al documento original: nombre, ruta y enlace al repositorio.
+        """
+        if not hoja:
+            return
+
+        respuesta.nombre_archivo = hoja.nombre_archivo
+        respuesta.ruta_hoja_vida = ruta_hoja_vida(hoja)
+        respuesta.url_hoja_vida = hoja.url_web
+
+    def roles_disponibles(self) -> list[RolDisponibleResponse]:
+        """Roles que la IA identificó en las hojas de vida ya indexadas."""
+        return [
+            RolDisponibleResponse(nombre=nombre, candidatos=total)
+            for nombre, total in self.repo.listar_roles()
+        ]
+
+    def listar(
+        self,
+        pagina: int = 1,
+        por_pagina: int = 20,
+    ) -> list[CandidatoResponse]:
+        candidatos = self.repo.listar(
+            limite=por_pagina,
+            desplazamiento=(pagina - 1) * por_pagina,
+        )
+
+        hojas = {
+            hoja.id: hoja
+            for hoja in self.hojas.listar_por_ids(
+                [c.hoja_de_vida_id for c in candidatos]
+            )
+        }
+
+        respuestas = []
+        for candidato in candidatos:
+            respuesta = CandidatoResponse.model_validate(candidato)
+            self._adjuntar_hoja(
+                respuesta,
+                hojas.get(candidato.hoja_de_vida_id),
+            )
+            respuestas.append(respuesta)
+
+        return respuestas

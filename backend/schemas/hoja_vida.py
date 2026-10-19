@@ -37,3 +37,16 @@ class SincronizacionResponse(BaseModel):
     #: Documentos registrados que no se pudieron mandar a indexar todavía.
     documentos_aplazados: int = 0
     mensaje: str
+
+
+class DisponibilidadHojaVidaResponse(BaseModel):
+    """HU-21: dónde está la hoja de vida y si se puede abrir."""
+
+    #: DISPONIBLE, MOVIDO, ELIMINADO, ENLACE_INVALIDO o NO_VERIFICABLE.
+    estado: str
+    #: True si el enlace se puede ofrecer. NO_VERIFICABLE también lo permite.
+    disponible: bool
+    mensaje: Optional[str] = None
+    nombre_archivo: str
+    ruta: str
+    url: Optional[str] = None

@@ -20,6 +20,14 @@ TIPO_ONEDRIVE = "ONEDRIVE"
 TIPO_GDRIVE = "GDRIVE"
 TIPOS_VALIDOS = (TIPO_ONEDRIVE, TIPO_GDRIVE)
 
+# Estado de un documento ya indexado frente a su origen (HU-21).
+DOC_DISPONIBLE = "DISPONIBLE"
+DOC_MOVIDO = "MOVIDO"
+DOC_ELIMINADO = "ELIMINADO"
+# El origen no respondió o este proveedor aún no sabe consultarlo: no es lo
+# mismo que "eliminado", y no debe tratarse como tal.
+DOC_NO_VERIFICABLE = "NO_VERIFICABLE"
+
 
 class RepositorioError(Exception):
     """Fallo de conexión con el repositorio de documentos (HU-26, RNF18)."""
@@ -57,6 +65,19 @@ class DocumentoRepositorio:
     hash_contenido: Optional[str]
     fecha_modificacion: Optional[datetime]
     tamanio: int
+
+
+@dataclass
+class EstadoDocumento:
+    """
+    Resultado de consultar un documento puntual al origen (HU-21).
+
+    `ruta_legible` es la ubicación pensada para una persona (nombre de la
+    carpeta, no su ID). Es None cuando el proveedor no pudo resolverla.
+    """
+
+    estado: str
+    ruta_legible: Optional[str] = None
 
 
 @dataclass
@@ -99,3 +120,13 @@ class RepositorioDocumentos(ABC):
     @abstractmethod
     def descargar(self, id_documento: str) -> bytes:
         """Contenido del documento en memoria. No se persiste en disco (RNF14)."""
+
+    def consultar_documento(self, id_documento: str) -> EstadoDocumento:
+        """
+        Dice si un documento ya indexado sigue donde estaba (HU-21).
+
+        Solo lectura (RNF11). No es abstracto a propósito: un origen que aún no
+        sabe consultarlo responde NO_VERIFICABLE y la interfaz deja abrir el
+        enlace en vez de afirmar que el archivo desapareció.
+        """
+        return EstadoDocumento(estado=DOC_NO_VERIFICABLE)
