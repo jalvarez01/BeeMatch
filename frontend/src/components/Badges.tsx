@@ -4,13 +4,15 @@ const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
   PROCESADA: 'Procesada',
   EN_ANALISIS: 'En análisis',
   BORRADOR: 'Borrador',
-  ERROR: 'Sin coincidencias',
+  SIN_COINCIDENCIAS: 'Sin coincidencias',
+  ERROR: 'Error',
 }
 
 const CLASE_ESTADO: Record<EstadoSolicitud, string> = {
   PROCESADA: 'bm-badge-green',
   EN_ANALISIS: 'bm-badge-yellow',
   BORRADOR: 'bm-badge-gray',
+  SIN_COINCIDENCIAS: 'bm-badge-red',
   ERROR: 'bm-badge-red',
 }
 
