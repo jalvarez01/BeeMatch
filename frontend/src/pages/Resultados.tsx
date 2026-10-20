@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { esperarResultado, marcarPreseleccion, obtenerResultados } from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
-import { AfinidadBadge, Tag } from '../components/Badges'
+import { AfinidadBadge, AfinidadPorcentaje, LeyendaAfinidad, Tag } from '../components/Badges'
 import BarraProgreso from '../components/BarraProgreso'
 import EstadoVacio from '../components/EstadoVacio'
 import { IconSpark } from '../components/Icons'
@@ -143,6 +143,7 @@ export default function Resultados() {
             <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
               Ordenados de mayor a menor afinidad con los criterios de la solicitud.
             </p>
+            <LeyendaAfinidad />
           </div>
           <button className="bm-btn bm-btn-dark" onClick={exportar}>
             Exportar preselección
@@ -174,7 +175,11 @@ export default function Resultados() {
       {resultado.recomendaciones.map((candidato) => (
         <article className="bm-cand" key={candidato.id}>
           <div className="score">
-            <div className="p">{candidato.puntaje_afinidad}%</div>
+            <AfinidadPorcentaje
+              className="p"
+              puntaje={candidato.puntaje_afinidad}
+              nivel={candidato.nivel}
+            />
             <AfinidadBadge nivel={candidato.nivel} />
           </div>
 

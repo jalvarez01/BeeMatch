@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { marcarPreseleccion, obtenerRecomendacion } from '../api/busquedas'
-import { AfinidadBadge, Tag } from '../components/Badges'
+import { AfinidadBadge, AfinidadPorcentaje, Tag } from '../components/Badges'
 import { IconSpark, IconUser } from '../components/Icons'
 import type { Recomendacion } from '../types'
 
@@ -62,7 +62,11 @@ export default function Candidato() {
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{candidato.puntaje_afinidad}%</div>
+            <AfinidadPorcentaje
+              puntaje={candidato.puntaje_afinidad}
+              nivel={candidato.nivel}
+              style={{ fontSize: 22, fontWeight: 700 }}
+            />
             <AfinidadBadge nivel={candidato.nivel} />
           </div>
         </div>
