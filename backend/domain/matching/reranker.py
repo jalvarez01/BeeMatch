@@ -34,7 +34,9 @@ class Reranker:
                     "puntaje_afinidad": puntaje,
                     "nivel": nivel_de(puntaje),
                     "resumen_ia": item.get("resumen"),
-                    "coincidencias": self._validar_coincidencias(item.get("coincidencias", [])),
+                    "coincidencias": self._completar_requisitos(
+                        self._validar_coincidencias(item.get("coincidencias", [])), requisitos
+                    ),
                 }
             )
 
@@ -67,3 +69,26 @@ class Reranker:
                 }
             )
         return validadas
+
+    @staticmethod
+    def _completar_requisitos(coincidencias: list[dict], requisitos: list[str]) -> list[dict]:
+        """
+        HU-19: todo requisito solicitado aparece en el desglose. Si el modelo
+        omitió alguno, se agrega como NO_EVIDENCIADO en lugar de desaparecer,
+        para que el reclutador vea explícitamente qué no respalda la hoja de vida.
+        """
+        evaluados = {c["requisito"].strip().casefold() for c in coincidencias}
+        completas = list(coincidencias)
+        for requisito in requisitos:
+            clave = requisito.strip().casefold()
+            if clave and clave not in evaluados:
+                evaluados.add(clave)
+                completas.append(
+                    {
+                        "requisito": requisito,
+                        "estado": "NO_EVIDENCIADO",
+                        "evidencia_texto": None,
+                        "fragmento_id": None,
+                    }
+                )
+        return completas

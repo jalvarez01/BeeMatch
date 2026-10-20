@@ -119,6 +119,7 @@
   color: var(--muted); flex: 1; min-width: 0;
 }
 .bm-field input:focus, .bm-field select:focus { outline: none; color: var(--ink); }
+.bm-field[data-error='true'] { border-color: var(--red); }
 .bm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Ajustes visuales de selects, chips y textarea */

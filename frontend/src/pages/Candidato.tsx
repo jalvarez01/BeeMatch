@@ -103,6 +103,11 @@ export default function Candidato() {
             ¿Por qué este perfil tiene {candidato.puntaje_afinidad}% de afinidad?
           </p>
 
+          {/* HU-19: explicación en lenguaje natural de las coincidencias con el perfil. */}
+          {candidato.resumen_ia && (
+            <p style={{ fontSize: 13, lineHeight: 1.6, margin: '0 0 18px' }}>{candidato.resumen_ia}</p>
+          )}
+
           <div className="bm-req">
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
@@ -122,7 +127,7 @@ export default function Candidato() {
             </div>
 
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Requiere revisión</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>No evidenciados</div>
               {enRevision.map((c) => (
                 <div className="bm-warn" key={c.requisito} style={{ marginBottom: 8 }}>
                   <div className="r">! {c.requisito}</div>
@@ -136,6 +141,13 @@ export default function Candidato() {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* HU-19: la IA sugiere; quien recluta valida y decide. */}
+          <div className="bm-aviso" role="note" style={{ marginTop: 18 }}>
+            <b>La decisión final corresponde al reclutador.</b> Este análisis es una sugerencia generada
+            con IA a partir de la hoja de vida: valídalo con tu criterio antes de presentar al candidato
+            al cliente.
           </div>
         </div>
 
