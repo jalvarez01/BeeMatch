@@ -3,6 +3,8 @@
 import logging
 
 from backend.domain.services.busqueda_service import BusquedaService
+from backend.infrastructure.repositorio.base import RepositorioError
+from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
 from backend.infrastructure.persistence.database import SessionLocal
 from backend.workers.scheduler import sincronizar_y_encolar
 
@@ -12,7 +14,18 @@ logger = logging.getLogger(__name__)
 def ejecutar_busqueda(busqueda_id: str) -> None:
     db = SessionLocal()
     try:
-        _sincronizar_repositorio()
+        try:
+            _sincronizar_repositorio()
+        except (RepositorioError, RepositorioNoConfiguradoError) as exc:
+            logger.exception(
+                "No fue posible acceder al repositorio antes de la búsqueda"
+            )
+            BusquedaService(db).marcar_error_repositorio(
+                busqueda_id,
+                str(exc),
+            )
+            return
+
         BusquedaService(db).ejecutar(busqueda_id)
     finally:
         db.close()
@@ -20,16 +33,9 @@ def ejecutar_busqueda(busqueda_id: str) -> None:
 
 def _sincronizar_repositorio() -> None:
     """
-    HU-16, criterios 1 y 3: antes de analizar se consulta la carpeta configurada,
-    así las hojas de vida nuevas entran en la búsqueda sin intervención manual.
+    Sincroniza el repositorio antes de ejecutar el análisis.
 
-    Va aquí y no en el router porque sin Redis `encolar` ejecuta en línea: hacerlo
-    en la petición HTTP dejaba la respuesta esperando la indexación de todo el
-    repositorio, y rompía el 202 inmediato que promete HU-18. Un fallo del origen
-    no cancela el análisis: se busca sobre lo que ya esté indexado y el motivo
-    queda en el log.
+    Los errores del repositorio se propagan a ejecutar_busqueda()
+    para registrar el fallo y actualizar el estado de la búsqueda.
     """
-    try:
-        sincronizar_y_encolar()
-    except Exception:
-        logger.exception("No se pudo sincronizar el repositorio antes de la búsqueda")
+    sincronizar_y_encolar()

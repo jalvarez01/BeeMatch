@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { esperarResultado, marcarPreseleccion, obtenerResultados } from '../api/busquedas'
+import { ejecutarBusqueda, esperarResultado, marcarPreseleccion, obtenerResultados } from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
 import { AfinidadBadge, Tag } from '../components/Badges'
@@ -20,12 +20,14 @@ export default function Resultados() {
   const [progreso, setProgreso] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
 
   const cargar = useCallback(async () => {
     setCargando(true)
     setError('')
     try {
       const inicial = await obtenerResultados(busquedaId)
+      setSolicitudIdReintento(inicial.solicitud_id)
 
       const final =
         inicial.estado === 'COMPLETADA'
@@ -47,6 +49,25 @@ export default function Resultados() {
   useEffect(() => {
     void cargar()
   }, [cargar])
+
+  const reintentar = async () => {
+    if (!solicitudIdReintento) {
+      await cargar()
+      return
+    }
+
+    setCargando(true)
+    setError('')
+
+    try {
+      const nuevaBusqueda = await ejecutarBusqueda(solicitudIdReintento)
+      navegar(`/resultados/${nuevaBusqueda.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCargando(false)
+    }
+  }
 
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {
     const actualizada = await marcarPreseleccion(recomendacionId, valor)
@@ -79,8 +100,12 @@ export default function Resultados() {
     return (
       <>
         <div className="bm-alert bm-alert-error">{error}</div>
-        <button className="bm-btn bm-btn-ghost" onClick={() => void cargar()}>
-          Reintentar
+        <button
+          className="bm-btn bm-btn-ghost"
+          onClick={() => void reintentar()}
+          disabled={cargando}
+        >
+          {cargando ? 'Reintentando...' : 'Reintentar'}
         </button>
       </>
     )

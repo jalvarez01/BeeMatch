@@ -10,6 +10,10 @@ import time
 from sqlalchemy.orm import Session
 
 from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS
+from backend.domain.services.bitacora_service import (
+    ACCION_ERROR_SERVICIO,
+    BitacoraService,
+)
 from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
@@ -119,17 +123,29 @@ class BusquedaService:
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_PROCESADA)
 
         except ProveedorEmbeddingsNoDisponibleError as exc:
-            # Mismo trato que un fallo del LLM: es una pieza del sistema que
-            # falta, y el motivo se dice tal cual en vez de "error inesperado".
-            self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=str(exc))
-            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
-        except ServicioIAError as exc:
-            # HU-26: el error se informa con claridad y la solicitud no se pierde.
-            self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=str(exc))
-            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
-        except Exception as exc:  # noqa: BLE001
+            self._registrar_error(solicitud, "IA_NO_DISPONIBLE", str(exc))
             self.busquedas.finalizar(
-                busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=f"Error inesperado: {exc}"
+                busqueda_id,
+                estado=BUSQUEDA_ERROR,
+                mensaje_error="El servicio de IA no está disponible. Puedes reintentar el análisis.",
+            )
+            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
+
+        except ServicioIAError as exc:
+            self._registrar_error(solicitud, "IA_TIMEOUT_O_ERROR", str(exc))
+            self.busquedas.finalizar(
+                busqueda_id,
+                estado=BUSQUEDA_ERROR,
+                mensaje_error="El servicio de IA no está disponible o excedió el tiempo de espera. Puedes reintentar el análisis.",
+            )
+            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
+
+        except Exception as exc:  # noqa: BLE001
+            self._registrar_error(solicitud, "ERROR_INESPERADO", str(exc))
+            self.busquedas.finalizar(
+                busqueda_id,
+                estado=BUSQUEDA_ERROR,
+                mensaje_error="No fue posible completar el análisis por un error inesperado. Puedes reintentarlo.",
             )
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
@@ -180,3 +196,46 @@ class BusquedaService:
             cv_no_procesables=self.hojas.contar_por_estado(ESTADO_NO_PROCESABLE),
         )
         self.solicitudes.cambiar_estado(solicitud_id, ESTADO_PROCESADA)
+
+    def _registrar_error(self, solicitud, tipo_error: str, detalle: str) -> None:
+        """Registra en la bitácora los errores que impiden completar una búsqueda."""
+        try:
+            BitacoraService(self.db).registrar(
+                accion=ACCION_ERROR_SERVICIO,
+                usuario_id=solicitud.usuario_id,
+                entidad="solicitud",
+                entidad_id=solicitud.id,
+                detalle=f"tipo={tipo_error}; detalle={detalle}",
+            )
+        except Exception:
+            self.db.rollback()
+
+    def marcar_error_repositorio(
+        self,
+        busqueda_id: str,
+        detalle: str,
+    ) -> None:
+        busqueda = self.busquedas.get_by_id(busqueda_id)
+        if not busqueda:
+            return
+
+        solicitud = self.solicitudes.get_by_id(busqueda.solicitud_id)
+        if not solicitud:
+            return
+
+        self._registrar_error(
+            solicitud,
+            "REPOSITORIO_NO_DISPONIBLE",
+            detalle,
+        )
+
+        self.busquedas.finalizar(
+            busqueda_id,
+            estado=BUSQUEDA_ERROR,
+            mensaje_error=(
+                "No fue posible acceder al repositorio de hojas de vida. "
+                "Contacte al administrador"
+            ),
+        )
+
+        self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
