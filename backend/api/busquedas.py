@@ -24,11 +24,33 @@ from backend.schemas.busqueda import (
     RecomendacionResponse,
 )
 from backend.schemas.hoja_vida import DisponibilidadHojaVidaResponse
-from backend.security import get_current_user
+from backend.security import get_current_user, puede_ver_solicitud
 from backend.workers.busqueda_worker import ejecutar_busqueda
 from backend.workers.queue import despachar
 
 router = APIRouter()
+
+
+def _exigir_acceso_a_busqueda(db: Session, busqueda_id: str, usuario) -> None:
+    """
+    HU-04: los resultados de una búsqueda son de quien la pidió. El Coordinador
+    solo abre los suyos; Director, Administrador y la superusuaria, los del área.
+    Si la búsqueda no existe se deja pasar: cada endpoint responde su propio 404.
+    """
+    busqueda = BusquedaService(db).busquedas.get_by_id(busqueda_id)
+    if not busqueda:
+        return
+    solicitud = SolicitudRepository(db).get_by_id(busqueda.solicitud_id)
+    if solicitud and not puede_ver_solicitud(usuario, solicitud):
+        raise HTTPException(
+            status_code=403, detail="No tienes permiso para acceder a esta búsqueda."
+        )
+
+
+def _exigir_acceso_a_recomendacion(db: Session, recomendacion_id: str, usuario) -> None:
+    recomendacion = BusquedaService(db).busquedas.get_recomendacion(recomendacion_id)
+    if recomendacion:
+        _exigir_acceso_a_busqueda(db, recomendacion.busqueda_id, usuario)
 
 
 @router.post("/solicitud/{solicitud_id}", response_model=BusquedaEstadoResponse, status_code=202)
@@ -46,6 +68,10 @@ def ejecutar(
     solicitud = solicitudes.get_by_id(solicitud_id)
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if not puede_ver_solicitud(current_user, solicitud):
+        raise HTTPException(
+            status_code=403, detail="No tienes permiso para acceder a esta solicitud."
+        )
     faltantes = campos_faltantes(solicitud.descripcion_libre, solicitud.rol_buscado)
     if faltantes:
         raise HTTPException(status_code=422, detail=mensaje_campos_faltantes(faltantes))
@@ -78,8 +104,9 @@ def ejecutar(
 
 
 @router.get("/{busqueda_id}/estado", response_model=BusquedaEstadoResponse)
-def estado(busqueda_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def estado(busqueda_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """HU-22: indicador de progreso durante el análisis."""
+    _exigir_acceso_a_busqueda(db, busqueda_id, current_user)
     busqueda = BusquedaService(db).busquedas.get_by_id(busqueda_id)
     if not busqueda:
         raise HTTPException(status_code=404, detail="Búsqueda no encontrada")
@@ -87,8 +114,11 @@ def estado(busqueda_id: str, db: Session = Depends(get_db), _=Depends(get_curren
 
 
 @router.get("/{busqueda_id}", response_model=BusquedaResultadoResponse)
-def resultados(busqueda_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def resultados(
+    busqueda_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     """HU-18, HU-20, HU-23: Top 5 con afinidad, o lista vacía si nadie superó el umbral."""
+    _exigir_acceso_a_busqueda(db, busqueda_id, current_user)
     resultado = ResultadoService(db).resultados(busqueda_id)
     if not resultado:
         raise HTTPException(status_code=404, detail="Búsqueda no encontrada")
@@ -96,8 +126,11 @@ def resultados(busqueda_id: str, db: Session = Depends(get_db), _=Depends(get_cu
 
 
 @router.get("/recomendacion/{recomendacion_id}", response_model=RecomendacionResponse)
-def detalle(recomendacion_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def detalle(
+    recomendacion_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     """HU-19, HU-21: explicación de coincidencias y ubicación de la hoja de vida."""
+    _exigir_acceso_a_recomendacion(db, recomendacion_id, current_user)
     recomendacion = ResultadoService(db).detalle_recomendacion(recomendacion_id)
     if not recomendacion:
         raise HTTPException(status_code=404, detail="Recomendación no encontrada")
@@ -108,8 +141,11 @@ def detalle(recomendacion_id: str, db: Session = Depends(get_db), _=Depends(get_
     "/recomendacion/{recomendacion_id}/hoja-de-vida",
     response_model=DisponibilidadHojaVidaResponse,
 )
-def hoja_de_vida(recomendacion_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def hoja_de_vida(
+    recomendacion_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
     """HU-21: ubicación de la hoja de vida y si el archivo sigue disponible."""
+    _exigir_acceso_a_recomendacion(db, recomendacion_id, current_user)
     disponibilidad = ResultadoService(db).disponibilidad_hoja_vida(recomendacion_id)
     if not disponibilidad:
         raise HTTPException(status_code=404, detail="Hoja de vida no encontrada")
@@ -124,6 +160,7 @@ def preseleccionar(
     current_user=Depends(get_current_user),
 ):
     """HU-24."""
+    _exigir_acceso_a_recomendacion(db, recomendacion_id, current_user)
     recomendacion = ResultadoService(db).marcar_preseleccion(recomendacion_id, datos.preseleccionado)
     if not recomendacion:
         raise HTTPException(status_code=404, detail="Recomendación no encontrada")

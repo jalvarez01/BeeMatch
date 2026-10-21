@@ -12,19 +12,23 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS
-from backend.domain.services.bitacora_service import (
-    ACCION_ERROR_SERVICIO,
-    BitacoraService,
-)
 from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
 from backend.domain.matching.scorer import supera_umbral
+from backend.domain.services.bitacora_service import (
+    ACCION_ERROR_SERVICIO,
+    BitacoraService,
+)
 from backend.infrastructure.llm.embeddings import (
     ProveedorEmbeddings,
     ProveedorEmbeddingsNoDisponibleError,
 )
-from backend.infrastructure.llm.llm_provider import ServicioIAError
+from backend.infrastructure.llm.llm_provider import (
+    ServicioIAError,
+    ServicioIANoConfiguradoError,
+    ServicioIARechazoError,
+)
 from backend.infrastructure.persistence.models._base import utcnow
 from backend.infrastructure.persistence.models.busqueda import (
     BUSQUEDA_COMPLETADA,
@@ -144,13 +148,16 @@ class BusquedaService:
                 solicitud.id, ESTADO_PROCESADA if recomendaciones else ESTADO_SIN_COINCIDENCIAS
             )
 
-        except ProveedorEmbeddingsNoDisponibleError as exc:
+        except (
+            ProveedorEmbeddingsNoDisponibleError,
+            ServicioIANoConfiguradoError,
+            ServicioIARechazoError,
+        ) as exc:
+            # HU-26: aquí reintentar no sirve (falta una clave o el modelo declinó),
+            # así que se dice el motivo real en lugar del aviso genérico de "no
+            # disponible"; el administrador necesita ese dato para corregirlo.
             self._registrar_error(solicitud, "IA_NO_DISPONIBLE", str(exc))
-            self.busquedas.finalizar(
-                busqueda_id,
-                estado=BUSQUEDA_ERROR,
-                mensaje_error="El servicio de IA no está disponible. Puedes reintentar el análisis.",
-            )
+            self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_ERROR, mensaje_error=str(exc))
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
         except ServicioIAError as exc:
@@ -158,7 +165,10 @@ class BusquedaService:
             self.busquedas.finalizar(
                 busqueda_id,
                 estado=BUSQUEDA_ERROR,
-                mensaje_error="El servicio de IA no está disponible o excedió el tiempo de espera. Puedes reintentar el análisis.",
+                mensaje_error=(
+                    "El servicio de IA no está disponible o excedió el tiempo de espera. "
+                    "Puedes reintentar el análisis."
+                ),
             )
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
@@ -167,7 +177,10 @@ class BusquedaService:
             self.busquedas.finalizar(
                 busqueda_id,
                 estado=BUSQUEDA_ERROR,
-                mensaje_error="No fue posible completar el análisis por un error inesperado. Puedes reintentarlo.",
+                mensaje_error=(
+                    "No fue posible completar el análisis por un error inesperado. "
+                    "Puedes reintentarlo."
+                ),
             )
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 

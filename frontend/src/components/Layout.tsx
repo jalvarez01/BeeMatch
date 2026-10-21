@@ -21,8 +21,10 @@ const TITULOS: Record<string, string> = {
 }
 
 const RUTAS_POR_ROL: Record<Rol, string[]> = {
-  COORDINADOR: ['/nueva-busqueda', '/candidatos'],
-  DIRECTOR: ['/nueva-busqueda', '/candidatos', '/historial'],
+  // HU-04: Coordinador solo registra solicitudes y consulta candidatos. Los resultados
+  // y el detalle del candidato son parte de ese mismo flujo: la búsqueda termina ahí.
+  COORDINADOR: ['/nueva-busqueda', '/candidatos', '/resultados', '/candidato'],
+  DIRECTOR: ['/nueva-busqueda', '/candidatos', '/historial', '/resultados', '/candidato'],
   ADMINISTRADOR: [
     '/inicio',
     '/nueva-busqueda',

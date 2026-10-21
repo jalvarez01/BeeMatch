@@ -86,14 +86,19 @@ def iniciar_sesion(datos: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/renovar", response_model=LoginResponse)
-def renovar_sesion(current_user=Depends(get_current_user)):
+def renovar_sesion(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     """
     HU-02: el navegador pide un token nuevo mientras el usuario está activo.
     Si deja de hacerlo, el token vence a los 30 minutos y la sesión se cierra.
+
+    HU-04: el rol del token se respeta durante la sesión, pero el token nuevo se
+    emite con el rol que hoy tiene la cuenta. Sin esto, un usuario activo
+    renovaría siempre el rol viejo y un cambio de permisos no le llegaría nunca.
     """
+    usuario = UsuarioRepository(db).get_by_id(current_user.id)
     return LoginResponse(
-        access_token=crear_token(current_user.id, current_user.correo, current_user.rol),
-        usuario=UsuarioResponse.model_validate(current_user),
+        access_token=crear_token(usuario.id, usuario.correo, usuario.rol),
+        usuario=UsuarioResponse.model_validate(usuario),
     )
 
 

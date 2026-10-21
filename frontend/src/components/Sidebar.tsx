@@ -76,7 +76,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="bm-sidebar-foot">
-        {rol === 'ADMINISTRADOR' && (
+        {puedeAdministrar && (
           <button className="cfg" onClick={() => navegar('/configuracion')}>
             Configuración
           </button>

@@ -2,6 +2,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from backend.config import DOMINIO_CORREO
+
 # SUPERADMINISTRADOR no se asigna desde la API: solo la siembra lo crea.
 Rol = Literal["COORDINADOR", "DIRECTOR", "ADMINISTRADOR"]
 
@@ -37,13 +39,13 @@ class UsuarioCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     rol: Rol = "COORDINADOR"
     id_entra: Optional[str] = None
-    
+
     @field_validator("correo")
     @classmethod
-    def validar_dominio_bee(cls, valor: EmailStr) -> EmailStr:
-        dominio = str(valor).rsplit("@", 1)[-1].lower()
-        if dominio != "bee.com.co":
-            raise ValueError("Solo se permiten correos con dominio @bee.com.co.")
+    def validar_dominio_corporativo(cls, valor: EmailStr) -> EmailStr:
+        """HU-03: el correo debe ser corporativo; el dominio sale de la configuración."""
+        if str(valor).rsplit("@", 1)[-1].lower() != DOMINIO_CORREO:
+            raise ValueError(f"Solo se permiten correos con dominio @{DOMINIO_CORREO}.")
         return valor
 
 
@@ -62,6 +64,13 @@ class UsuarioUpdate(BaseModel):
     correo: Optional[EmailStr] = None
     rol: Optional[Rol] = None
     activo: Optional[bool] = None
+
+    @field_validator("correo")
+    @classmethod
+    def validar_dominio_corporativo(cls, valor: Optional[EmailStr]) -> Optional[EmailStr]:
+        if valor is not None and str(valor).rsplit("@", 1)[-1].lower() != DOMINIO_CORREO:
+            raise ValueError(f"Solo se permiten correos con dominio @{DOMINIO_CORREO}.")
+        return valor
 
 
 class CambiarPasswordRequest(BaseModel):

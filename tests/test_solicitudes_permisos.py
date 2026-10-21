@@ -3,9 +3,9 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from backend.api.solicitudes import _verificar_acceso_solicitud
+from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.models.solicitud import SolicitudModel
 from backend.infrastructure.persistence.models.usuario import UsuarioModel
-from backend.infrastructure.persistence.database import get_db
 from backend.main import app
 from backend.security import get_current_user
 

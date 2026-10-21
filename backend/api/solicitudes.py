@@ -12,24 +12,29 @@ from backend.schemas.solicitud import (
     SolicitudResponse,
     SolicitudUpdate,
 )
-from backend.security import ROL_DIRECTOR, exigir_rol, get_current_user
+from backend.security import (
+    ROL_ADMINISTRADOR,
+    ROL_DIRECTOR,
+    exigir_rol,
+    get_current_user,
+    puede_ver_solicitud,
+)
 
 router = APIRouter()
 
+
 def _verificar_acceso_solicitud(solicitud, usuario):
-    if solicitud.usuario_id == usuario.id:
-        return
+    """HU-04: el Coordinador solo abre sus solicitudes; los demás roles, las del área."""
+    if not puede_ver_solicitud(usuario, solicitud):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para acceder a esta solicitud.",
+        )
 
-    if usuario.rol in ("DIRECTOR", "ADMINISTRADOR"):
-        return
-
-    raise HTTPException(
-        status_code=403,
-        detail="No tienes permiso para acceder a esta solicitud.",
-    )
 
 def _service(db: Session = Depends(get_db)) -> SolicitudService:
     return SolicitudService(db)
+
 
 @router.post("/", response_model=SolicitudResponse, status_code=201)
 def crear_solicitud(
@@ -52,6 +57,7 @@ def crear_solicitud(
     )
     return solicitud
 
+
 @router.get("/", response_model=HistorialResponse)
 def historial(
     estado: Optional[str] = None,
@@ -59,11 +65,12 @@ def historial(
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=10, ge=1, le=50),
     svc: SolicitudService = Depends(_service),
-    _=Depends(exigir_rol(ROL_DIRECTOR, "ADMINISTRADOR")),
+    _=Depends(exigir_rol(ROL_DIRECTOR, ROL_ADMINISTRADOR)),
 ):
     """HU-13: historial filtrable."""
     solicitudes, total = svc.historial(estado, texto, pagina, por_pagina)
     return HistorialResponse(total=total, pagina=pagina, solicitudes=solicitudes)
+
 
 @router.get("/{solicitud_id}", response_model=SolicitudResponse)
 def obtener_solicitud(
@@ -79,6 +86,7 @@ def obtener_solicitud(
     _verificar_acceso_solicitud(solicitud_model, current_user)
 
     return svc.obtener(solicitud_id)
+
 
 @router.put("/{solicitud_id}", response_model=SolicitudResponse)
 def actualizar_solicitud(
@@ -101,7 +109,8 @@ def actualizar_solicitud(
 
     return solicitud
 
-@router.post("/{solicitud_id}/duplicar", response_model=SolicitudResponse)
+
+@router.post("/{solicitud_id}/duplicar", response_model=SolicitudResponse, status_code=201)
 def duplicar_solicitud(
     solicitud_id: str,
     svc: SolicitudService = Depends(_service),

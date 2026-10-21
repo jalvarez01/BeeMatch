@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import os
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Optional
 
 import jwt
@@ -29,7 +30,6 @@ from sqlalchemy.orm import Session
 from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_MINUTOS, JWT_SECRET
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
-from types import SimpleNamespace
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -46,6 +46,16 @@ ROLES_QUE_GESTIONA = {
     ROL_SUPERADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR},
     ROL_ADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR},
 }
+
+
+# HU-04: Director, Administrador y la superusuaria ven el trabajo de toda el área;
+# el Coordinador solo el que él mismo registró.
+ROLES_CON_VISTA_COMPLETA = {ROL_DIRECTOR, ROL_ADMINISTRADOR, ROL_SUPERADMINISTRADOR}
+
+
+def puede_ver_solicitud(usuario, solicitud) -> bool:
+    """¿Puede `usuario` abrir la solicitud, o la búsqueda y resultados que salen de ella?"""
+    return usuario.rol in ROLES_CON_VISTA_COMPLETA or solicitud.usuario_id == usuario.id
 
 
 def puede_gestionar(actor_rol: str, objetivo_rol: str) -> bool:
@@ -141,6 +151,7 @@ def decodificar_token(token: str) -> dict:
 
 # --- Dependencias ------------------------------------------------------------
 
+
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
@@ -160,11 +171,8 @@ def get_current_user(
     # El rol del token se mantiene hasta que el usuario inicie sesión de nuevo.
     rol_sesion = payload.get("rol")
     if rol_sesion not in ROLES_VALIDOS:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido."
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.")
 
-    
     # Crear una copia independiente para no modificar el objeto de SQLAlchemy.
     datos_usuario = {
         columna.name: getattr(usuario, columna.name)
@@ -175,6 +183,7 @@ def get_current_user(
     # El rol del token se aplica solo a esta sesión.
     usuario_sesion.rol = rol_sesion
     return usuario_sesion
+
 
 def exigir_rol(*roles: str):
     """Restringe un endpoint a ciertos roles (RNF08)."""

@@ -3,11 +3,12 @@
 import logging
 
 from backend.domain.services.busqueda_service import BusquedaService
-from backend.infrastructure.repositorio.base import RepositorioError
 from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
+from backend.infrastructure.crypto import CifradoError
 from backend.infrastructure.persistence.database import SessionLocal
 from backend.infrastructure.persistence.models.busqueda import BUSQUEDA_EJECUTANDO
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
+from backend.infrastructure.repositorio.base import RepositorioError
 from backend.workers.scheduler import sincronizar_y_encolar
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,9 @@ def ejecutar_busqueda(busqueda_id: str) -> None:
 
         try:
             _sincronizar_repositorio()
-        except (RepositorioError, RepositorioNoConfiguradoError) as exc:
+        except (RepositorioError, RepositorioNoConfiguradoError, CifradoError) as exc:
+            # CifradoError: las credenciales guardadas ya no se pueden descifrar (cambió
+            # JWT_SECRET). Para quien busca es lo mismo: el repositorio no es accesible.
             logger.exception("No fue posible acceder al repositorio antes de la búsqueda")
             BusquedaService(db).marcar_error_repositorio(busqueda_id, str(exc))
             return

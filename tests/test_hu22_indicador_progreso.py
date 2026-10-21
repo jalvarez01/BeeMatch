@@ -59,7 +59,7 @@ def api(monkeypatch):
     db = sessionmaker(bind=motor)()
 
     usuario = UsuarioModel(
-        nombre="Reclutador", correo="reclutador@bee.com.co", password_hash="x", rol="ANALISTA"
+        nombre="Reclutador", correo="reclutador@bee.com.co", password_hash="x", rol="COORDINADOR"
     )
     db.add(usuario)
     db.commit()
@@ -68,7 +68,9 @@ def api(monkeypatch):
         yield db
 
     app.dependency_overrides[get_db] = get_db_de_prueba
-    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=usuario.id)
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=usuario.id, rol=usuario.rol
+    )
 
     despachos = []
     monkeypatch.setattr(

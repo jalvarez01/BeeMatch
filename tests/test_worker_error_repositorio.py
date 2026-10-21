@@ -3,6 +3,7 @@ import pytest
 from backend.domain.services.repositorio_config_service import (
     RepositorioNoConfiguradoError,
 )
+from backend.infrastructure.crypto import CifradoError
 from backend.infrastructure.repositorio.base import RepositorioError
 from backend.workers import busqueda_worker
 
@@ -20,6 +21,7 @@ class SesionFalsa:
     [
         RepositorioError("Error de conexión"),
         RepositorioNoConfiguradoError("Repositorio no configurado"),
+        CifradoError("No se pudo descifrar la configuración guardada."),
     ],
 )
 def test_error_repositorio_marca_busqueda_y_cierra_sesion(

@@ -29,7 +29,6 @@ export default function App() {
         <Route path="/resultados/:busquedaId" element={<Resultados />} />
         <Route path="/candidato/:recomendacionId" element={<Candidato />} />
         <Route path="/configuracion" element={<Configuracion />} />
-        <Route path="/usuarios" element={<Usuarios />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/inicio" replace />} />
