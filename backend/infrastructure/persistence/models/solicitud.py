@@ -10,6 +10,9 @@ from backend.infrastructure.persistence.models._base import nuevo_id, utcnow
 ESTADO_BORRADOR = "BORRADOR"
 ESTADO_EN_ANALISIS = "EN_ANALISIS"
 ESTADO_PROCESADA = "PROCESADA"
+# HU-23: el análisis terminó bien, pero ningún candidato alcanzó el mínimo de
+# afinidad. No es un ERROR: ahí falló el sistema; aquí faltan perfiles afines.
+ESTADO_SIN_COINCIDENCIAS = "SIN_COINCIDENCIAS"
 ESTADO_ERROR = "ERROR"
 
 
