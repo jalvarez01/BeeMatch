@@ -35,6 +35,7 @@ class RecomendacionResponse(BaseModel):
     anios_experiencia: Optional[int] = None
     tecnologias: list[str] = []
     ubicacion: Optional[str] = None
+    nombre_archivo: Optional[str] = None  # HU-21
     ruta_hoja_vida: Optional[str] = None  # HU-21
     url_hoja_vida: Optional[str] = None
 

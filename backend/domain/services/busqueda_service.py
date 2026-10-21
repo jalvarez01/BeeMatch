@@ -6,6 +6,8 @@ Lo invoca el worker de búsqueda, nunca la petición HTTP directamente (RNF04).
 """
 
 import time
+from datetime import timedelta
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -23,10 +25,12 @@ from backend.infrastructure.llm.embeddings import (
     ProveedorEmbeddingsNoDisponibleError,
 )
 from backend.infrastructure.llm.llm_provider import ServicioIAError
+from backend.infrastructure.persistence.models._base import utcnow
 from backend.infrastructure.persistence.models.busqueda import (
     BUSQUEDA_COMPLETADA,
     BUSQUEDA_EJECUTANDO,
     BUSQUEDA_ERROR,
+    BusquedaModel,
 )
 from backend.infrastructure.persistence.models.hoja_vida import (
     ESTADO_INDEXADA,
@@ -41,6 +45,10 @@ from backend.infrastructure.persistence.repositories.busqueda_repo import Busque
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
+
+# Una búsqueda pendiente o ejecutándose más tiempo que esto se da por abandonada.
+# Supera el job_timeout de la cola (900 s), así que ningún trabajo vivo la alcanza.
+VIGENCIA_BUSQUEDA_EN_CURSO = timedelta(minutes=20)
 
 
 class BusquedaService:
@@ -59,6 +67,12 @@ class BusquedaService:
         """Crea la búsqueda y devuelve su id para que el frontend haga polling."""
         busqueda = self.busquedas.crear(solicitud_id)
         return busqueda.id
+
+    def en_curso(self, solicitud_id: str) -> Optional[BusquedaModel]:
+        """HU-22: la búsqueda viva de la solicitud, para no lanzar otra encima."""
+        return self.busquedas.en_curso_de_solicitud(
+            solicitud_id, desde=utcnow() - VIGENCIA_BUSQUEDA_EN_CURSO
+        )
 
     def ejecutar(self, busqueda_id: str) -> None:
         """Camino crítico. Se ejecuta dentro del worker."""

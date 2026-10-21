@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from backend.domain.services.hoja_vida_service import HojaDeVidaService, ruta_hoja_vida
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
@@ -36,6 +37,21 @@ class ResultadoService:
         recomendacion = self.busquedas.get_recomendacion(recomendacion_id)
         return self._enriquecer(recomendacion) if recomendacion else None
 
+    def disponibilidad_hoja_vida(self, recomendacion_id: str):
+        """
+        HU-21: ¿sigue disponible la hoja de vida de esta recomendación?
+
+        None si la recomendación o su documento no existen.
+        """
+        recomendacion = self.busquedas.get_recomendacion(recomendacion_id)
+        if not recomendacion:
+            return None
+        candidato = self.candidatos.get_by_id(recomendacion.candidato_id)
+        hoja = self.hojas.get_by_id(candidato.hoja_de_vida_id) if candidato else None
+        if not hoja:
+            return None
+        return HojaDeVidaService(self.db).disponibilidad(hoja)
+
     def marcar_preseleccion(self, recomendacion_id: str, valor: bool) -> Optional[RecomendacionResponse]:
         """HU-24: el estado de preselección persiste al volver al detalle."""
         recomendacion = self.busquedas.marcar_preseleccion(recomendacion_id, valor)
@@ -59,7 +75,8 @@ class ResultadoService:
             # HU-21: ubicación de la hoja de vida en el repositorio.
             hoja = self.hojas.get_by_id(candidato.hoja_de_vida_id)
             if hoja:
-                respuesta.ruta_hoja_vida = f"{hoja.ruta}/{hoja.nombre_archivo}".replace("//", "/")
+                respuesta.nombre_archivo = hoja.nombre_archivo
+                respuesta.ruta_hoja_vida = ruta_hoja_vida(hoja)
                 respuesta.url_hoja_vida = hoja.url_web
 
         respuesta.coincidencias = [
