@@ -45,6 +45,7 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 @app.on_event("startup")
 def on_startup():
     init_db()
+    _informar_cola()
     _sembrar_parametros()
     _sembrar_superusuario()
     _sembrar_repositorio()
@@ -55,6 +56,22 @@ def on_startup():
         from backend.workers.scheduler import iniciar_planificador
 
         iniciar_planificador()
+
+
+def _informar_cola() -> None:
+    """Deja en el log si los trabajos irán a Redis o correrán sin él, para no adivinarlo."""
+    from backend.workers.queue import get_cola, hay_workers
+
+    cola = get_cola()
+    if cola is None:
+        logger.warning("Redis no disponible: los trabajos corren en segundo plano dentro de la API.")
+    elif not hay_workers(cola):
+        logger.warning(
+            "Redis activo pero sin worker: los trabajos corren dentro de la API. "
+            "Arranca uno con: python -m backend.workers.run_worker"
+        )
+    else:
+        logger.info("Cola de trabajos en Redis, con worker activo.")
 
 
 def _hay_origen_configurado() -> bool:

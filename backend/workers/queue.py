@@ -37,10 +37,30 @@ def get_cola():
         return None
 
 
+def hay_workers(cola) -> bool:
+    """
+    ¿Hay algún worker escuchando esta cola?
+
+    Redis puede estar arriba sin que nadie procese lo que se encola: el trabajo
+    se quedaría esperando para siempre y la búsqueda mostraría "en cola" sin
+    avanzar. Si no se puede averiguar se asume que sí, para no desviar trabajos
+    que sí tienen quien los atienda.
+    """
+    try:
+        from rq import Worker
+
+        return Worker.count(queue=cola) > 0
+    except Exception:
+        return True
+
+
 def encolar(funcion: Callable, *args, timeout: int = 900) -> Optional[str]:
-    """Encola el trabajo y devuelve su id. En desarrollo sin Redis, ejecuta directo."""
+    """
+    Encola el trabajo y devuelve su id. Sin Redis, o con Redis pero sin worker
+    que lo atienda, ejecuta directo.
+    """
     cola = get_cola()
-    if cola is None:
+    if cola is None or not hay_workers(cola):
         funcion(*args)
         return None
     return cola.enqueue(funcion, *args, job_timeout=timeout).id
@@ -50,7 +70,7 @@ def despachar(
     tareas: "BackgroundTasks", funcion: Callable, *args, timeout: int = 900
 ) -> Optional[str]:
     """
-    Como `encolar`, pero sin Redis el trabajo corre en segundo plano en vez de en línea.
+    Como `encolar`, pero sin Redis (o sin worker) el trabajo corre en segundo plano en vez de en línea.
 
     `encolar` ejecuta directo, y dentro de una petición eso deja la respuesta
     esperando todo el análisis: el frontend no recibe el 202 hasta que termina y
@@ -58,7 +78,7 @@ def despachar(
     respuesta sale primero y el trabajo corre después.
     """
     cola = get_cola()
-    if cola is None:
+    if cola is None or not hay_workers(cola):
         tareas.add_task(funcion, *args)
         return None
     return cola.enqueue(funcion, *args, job_timeout=timeout).id
