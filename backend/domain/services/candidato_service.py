@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from backend.domain.services.hoja_vida_service import ruta_hoja_vida
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.schemas.candidato import (
@@ -49,7 +50,7 @@ class CandidatoService:
         if not hoja:
             return
         respuesta.nombre_archivo = hoja.nombre_archivo
-        respuesta.ruta_hoja_vida = f"{hoja.ruta}/{hoja.nombre_archivo}".replace("//", "/")
+        respuesta.ruta_hoja_vida = ruta_hoja_vida(hoja)
         respuesta.url_hoja_vida = hoja.url_web
 
     def roles_disponibles(self) -> list[RolDisponibleResponse]:

@@ -45,7 +45,9 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 @app.on_event("startup")
 def on_startup():
     init_db()
+    _informar_cola()
     _sembrar_parametros()
+    _sembrar_superusuario()
     _sembrar_repositorio()
 
     # El planificador solo arranca si APScheduler está instalado y hay un
@@ -54,6 +56,22 @@ def on_startup():
         from backend.workers.scheduler import iniciar_planificador
 
         iniciar_planificador()
+
+
+def _informar_cola() -> None:
+    """Deja en el log si los trabajos irán a Redis o correrán sin él, para no adivinarlo."""
+    from backend.workers.queue import get_cola, hay_workers
+
+    cola = get_cola()
+    if cola is None:
+        logger.warning("Redis no disponible: los trabajos corren en segundo plano dentro de la API.")
+    elif not hay_workers(cola):
+        logger.warning(
+            "Redis activo pero sin worker: los trabajos corren dentro de la API. "
+            "Arranca uno con: python -m backend.workers.run_worker"
+        )
+    else:
+        logger.info("Cola de trabajos en Redis, con worker activo.")
 
 
 def _hay_origen_configurado() -> bool:
@@ -92,6 +110,48 @@ def _sembrar_parametros():
         for clave, valor in defaults.items():
             if not repo.get(clave):
                 repo.establecer(clave, valor)
+    finally:
+        db.close()
+
+
+def _sembrar_superusuario():
+    """
+    Crea a la superusuaria (HU-03) si todavía no existe ninguna.
+
+    Si el correo configurado ya pertenece a una cuenta, esa cuenta se asciende en
+    lugar de duplicarla. Cuando ya hay una superusuaria no se toca nada: el rol
+    no se cambia desde la aplicación, así que esta es la única vía de alta.
+    """
+    from backend.config import SUPERUSUARIO_CORREO, SUPERUSUARIO_NOMBRE, SUPERUSUARIO_PASSWORD
+    from backend.infrastructure.persistence.database import SessionLocal
+    from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
+    from backend.security import ROL_SUPERADMINISTRADOR, hashear_password
+
+    if not SUPERUSUARIO_CORREO:
+        return
+
+    db = SessionLocal()
+    try:
+        repo = UsuarioRepository(db)
+        if repo.existe_rol(ROL_SUPERADMINISTRADOR):
+            return
+
+        existente = repo.get_by_correo(SUPERUSUARIO_CORREO)
+        if existente:
+            repo.actualizar(existente, rol=ROL_SUPERADMINISTRADOR, activo=True, pendiente=False)
+            logger.info("Cuenta existente ascendida a SUPERADMINISTRADOR.")
+        elif SUPERUSUARIO_PASSWORD:
+            repo.crear(
+                nombre=SUPERUSUARIO_NOMBRE,
+                correo=SUPERUSUARIO_CORREO,
+                rol=ROL_SUPERADMINISTRADOR,
+                password_hash=hashear_password(SUPERUSUARIO_PASSWORD),
+            )
+            logger.info("Superusuaria creada.")
+        else:
+            logger.warning("SUPERUSUARIO_CORREO sin SUPERUSUARIO_PASSWORD: no se creó la superusuaria.")
+    except Exception:
+        logger.exception("No se pudo sembrar a la superusuaria.")
     finally:
         db.close()
 

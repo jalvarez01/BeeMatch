@@ -99,14 +99,29 @@ cp .env.example .env
 uvicorn backend.main:app --reload
 ```
 
-Sin `DATABASE_URL` usa SQLite y funciona sin PostgreSQL. Sin `REDIS_URL` los trabajos se ejecutan
-en línea en vez de encolarse: sirve para desarrollo, no para producción.
+Sin `DATABASE_URL` usa SQLite y funciona sin PostgreSQL. Sin Redis los trabajos (la búsqueda y la
+indexación de hojas de vida) corren en segundo plano dentro de la propia API: sirve para desarrollar,
+pero si el servidor se reinicia a mitad de un trabajo, este se pierde.
 
-**Worker** (en otra terminal, si hay Redis)
+**Redis y worker** (recomendado: así la búsqueda sobrevive a un reinicio de la API)
+
+Redis se levanta con Docker, igual en macOS, Linux y Windows. Solo ese servicio, sin construir nada:
 
 ```bash
-rq worker beematch --url redis://localhost:6379/0
+docker compose up -d redis
 ```
+
+El worker es el proceso que toma los trabajos de la cola. En otra terminal, con el entorno virtual activo:
+
+```bash
+python -m backend.workers.run_worker
+```
+
+No uses `rq worker` en macOS: hace `fork()` y el sistema mata el proceso. El comando de arriba usa un
+worker sin fork que funciona igual en cualquier sistema. Al arrancar, la API deja en el log cuál de
+estos tres modos está usando: Redis con worker, Redis sin worker (los trabajos corren en la API) o sin Redis.
+
+Para apagar Redis: `docker compose stop redis`.
 
 **Frontend**
 

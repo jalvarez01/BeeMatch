@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import os
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Optional
 
 import jwt
@@ -26,7 +27,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_HORAS, JWT_SECRET
+from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_MINUTOS, JWT_SECRET
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 
@@ -35,7 +36,31 @@ security_scheme = HTTPBearer(auto_error=False)
 ROL_COORDINADOR = "COORDINADOR"
 ROL_DIRECTOR = "DIRECTOR"
 ROL_ADMINISTRADOR = "ADMINISTRADOR"
-ROLES_VALIDOS = {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR}
+ROL_SUPERADMINISTRADOR = "SUPERADMINISTRADOR"
+ROLES_VALIDOS = {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR, ROL_SUPERADMINISTRADOR}
+
+# HU-03: roles que un actor puede otorgar o retirar. La superusuaria nunca
+# aparece como objetivo: su rol no se puede dar ni quitar desde la aplicación,
+# así que ningún administrador, por poderoso que sea, llega a igualarla.
+ROLES_QUE_GESTIONA = {
+    ROL_SUPERADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR},
+    ROL_ADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR},
+}
+
+
+# HU-04: Director, Administrador y la superusuaria ven el trabajo de toda el área;
+# el Coordinador solo el que él mismo registró.
+ROLES_CON_VISTA_COMPLETA = {ROL_DIRECTOR, ROL_ADMINISTRADOR, ROL_SUPERADMINISTRADOR}
+
+
+def puede_ver_solicitud(usuario, solicitud) -> bool:
+    """¿Puede `usuario` abrir la solicitud, o la búsqueda y resultados que salen de ella?"""
+    return usuario.rol in ROLES_CON_VISTA_COMPLETA or solicitud.usuario_id == usuario.id
+
+
+def puede_gestionar(actor_rol: str, objetivo_rol: str) -> bool:
+    """¿Puede `actor_rol` editar o inactivar a un usuario con `objetivo_rol`?"""
+    return objetivo_rol in ROLES_QUE_GESTIONA.get(actor_rol, set())
 
 # --- Contraseñas -------------------------------------------------------------
 
@@ -107,7 +132,7 @@ def crear_token(usuario_id: str, correo: str, rol: str) -> str:
         "correo": correo,
         "rol": rol,
         "iat": datetime.now(UTC),
-        "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRACION_HORAS),
+        "exp": datetime.now(UTC) + timedelta(minutes=JWT_EXPIRACION_MINUTOS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -142,14 +167,30 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo."
         )
-    return usuario
+
+    # El rol del token se mantiene hasta que el usuario inicie sesión de nuevo.
+    rol_sesion = payload.get("rol")
+    if rol_sesion not in ROLES_VALIDOS:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.")
+
+    # Crear una copia independiente para no modificar el objeto de SQLAlchemy.
+    datos_usuario = {
+        columna.name: getattr(usuario, columna.name)
+        for columna in usuario.__table__.columns
+    }
+    usuario_sesion = SimpleNamespace(**datos_usuario)
+
+    # El rol del token se aplica solo a esta sesión.
+    usuario_sesion.rol = rol_sesion
+    return usuario_sesion
 
 
 def exigir_rol(*roles: str):
     """Restringe un endpoint a ciertos roles (RNF08)."""
 
     def _verificar(current_user=Depends(get_current_user)):
-        if current_user.rol not in roles:
+        # La superusuaria tiene todos los permisos (HU-03).
+        if current_user.rol != ROL_SUPERADMINISTRADOR and current_user.rol not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso para realizar esta acción.",

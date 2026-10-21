@@ -8,18 +8,22 @@ import Dashboard from './pages/Dashboard'
 import Historial from './pages/Historial'
 import Login from './pages/Login'
 import NuevaBusqueda from './pages/NuevaBusqueda'
+import Registro from './pages/Registro'
 import Resultados from './pages/Resultados'
 import Solicitudes from './pages/Solicitudes'
+import Usuarios from './pages/Usuarios'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/registro" element={<Registro />} />
 
       <Route element={<Layout />}>
         <Route path="/inicio" element={<Dashboard />} />
         <Route path="/nueva-busqueda" element={<NuevaBusqueda />} />
         <Route path="/solicitudes" element={<Solicitudes />} />
+        <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/candidatos" element={<Candidatos />} />
         <Route path="/historial" element={<Historial />} />
         <Route path="/resultados/:busquedaId" element={<Resultados />} />

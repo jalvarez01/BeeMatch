@@ -8,7 +8,7 @@ from backend.infrastructure.persistence.models.hoja_vida import ESTADO_INDEXADA
 from backend.infrastructure.persistence.models.solicitud import (
     ESTADO_BORRADOR,
     ESTADO_EN_ANALISIS,
-    ESTADO_PROCESADA,
+    ESTADO_SIN_COINCIDENCIAS,
 )
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
@@ -32,7 +32,6 @@ class DashboardService:
 
         puntajes: list[float] = []
         alta_afinidad = 0
-        sin_coincidencias = 0
         recomendadas = 0
 
         for solicitud in self.solicitudes.listar(limite=50):
@@ -40,8 +39,6 @@ class DashboardService:
             if not busqueda:
                 continue
             recomendaciones = self.busquedas.listar_recomendaciones(busqueda.id)
-            if not recomendaciones and solicitud.estado == ESTADO_PROCESADA:
-                sin_coincidencias += 1
             recomendadas += len(recomendaciones)
             for r in recomendaciones:
                 puntajes.append(r.puntaje_afinidad)
@@ -56,7 +53,7 @@ class DashboardService:
             afinidad_promedio=round(sum(puntajes) / len(puntajes), 1) if puntajes else 0.0,
             candidatos_alta_afinidad=alta_afinidad,
             perfiles_nuevos=self.candidatos.contar(),
-            solicitudes_sin_coincidencias=sin_coincidencias,
+            solicitudes_sin_coincidencias=self.solicitudes.contar(ESTADO_SIN_COINCIDENCIAS),
             recientes=[self._reciente(s) for s in recientes],
         )
 

@@ -6,6 +6,9 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const CLAVE_SESION = 'beematch_sesion'
 
+/** Lo emite el cliente cuando el servidor rechaza la sesión; el Layout lo atiende. */
+export const EVENTO_SESION_EXPIRADA = 'beematch:sesion-expirada'
+
 export function guardarSesion(sesion: unknown): void {
   localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion))
 }
@@ -65,6 +68,9 @@ export async function apiFetch<T>(
   if (respuesta.status === 401) {
     borrarSesion()
     const cuerpo = await respuesta.json().catch(() => ({}))
+    // HU-02: con sesión abierta, un 401 es una sesión vencida; se avisa para
+    // llevar al usuario al inicio de sesión en lugar de dejar la pantalla rota.
+    if (requiereAuth) window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA))
     throw new Error(cuerpo.detail || 'La sesión expiró. Inicia sesión nuevamente.')
   }
 

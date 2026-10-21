@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { iniciarSesion } from '../api/auth'
 import { IconEye } from '../components/Icons'
@@ -8,7 +8,10 @@ import { IconEye } from '../components/Icons'
 export default function Login() {
   const navegar = useNavigate()
   const ubicacion = useLocation()
-  const destino = (ubicacion.state as { desde?: string })?.desde ?? '/inicio'
+  const estado = ubicacion.state as { desde?: string; motivo?: string } | null
+  const destino = estado?.desde ?? '/inicio'
+  // HU-02: motivo por el que se llegó aquí (inactividad, sesión vencida).
+  const motivo = estado?.motivo
 
   const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
@@ -115,11 +118,15 @@ export default function Login() {
               </button>
             </div>
 
+            {motivo && !error && <p className="bm-aviso">{motivo}</p>}
             {error && <p className="bm-error">{error}</p>}
 
             <button type="submit" className="bm-btn bm-btn-primary" disabled={cargando}>
               {cargando ? 'Ingresando…' : 'Iniciar sesión'}
             </button>
+            <p className="foot">
+              ¿Primera vez? <Link to="/registro">Crear cuenta</Link>
+            </p>
             <p className="foot">Acceso exclusivo para personal autorizado de BEE.</p>
           </form>
           <span className="copy">© 2026 BEE Consultoría y Negocios</span>

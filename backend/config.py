@@ -73,6 +73,23 @@ JWT_SECRET = os.getenv("JWT_SECRET", "beematch-dev-secret-cambiar-en-produccion"
 # Debe ser una clave Fernet válida. Si se omite, se deriva del JWT_SECRET.
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRACION_HORAS = int(os.getenv("JWT_EXPIRACION_HORAS", "8"))
+
+# HU-02: la sesión se cierra tras 30 minutos sin actividad. El token dura lo
+# mismo y el navegador lo renueva mientras el usuario trabaja, así el servidor
+# también rechaza un token copiado que lleva media hora sin usarse.
+JWT_EXPIRACION_MINUTOS = int(os.getenv("JWT_EXPIRACION_MINUTOS", "30"))
+
+# HU-01: tras LOGIN_MAX_INTENTOS fallos seguidos el acceso se bloquea.
+LOGIN_MAX_INTENTOS = int(os.getenv("LOGIN_MAX_INTENTOS", "5"))
+LOGIN_BLOQUEO_MINUTOS = int(os.getenv("LOGIN_BLOQUEO_MINUTOS", "15"))
+
+# HU-03: el autorregistro solo acepta correos corporativos de este dominio.
+DOMINIO_CORREO = os.getenv("DOMINIO_CORREO", "bee.com.co").lower()
+
+# HU-03: superusuaria (Diana). Si no existe ninguna al arrancar y el correo y la
+# contraseña están definidos, se crea con el rol SUPERADMINISTRADOR.
+SUPERUSUARIO_CORREO = os.getenv("SUPERUSUARIO_CORREO", "").strip().lower()
+SUPERUSUARIO_NOMBRE = os.getenv("SUPERUSUARIO_NOMBRE", "Diana")
+SUPERUSUARIO_PASSWORD = os.getenv("SUPERUSUARIO_PASSWORD", "")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")

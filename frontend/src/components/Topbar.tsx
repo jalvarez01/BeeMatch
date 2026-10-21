@@ -3,6 +3,7 @@ import type { Sesion } from '../types'
 import { IconUser } from './Icons'
 
 const ETIQUETA_ROL: Record<string, string> = {
+  SUPERADMINISTRADOR: 'Superadministradora',
   ADMINISTRADOR: 'Administrador',
   COORDINADOR: 'Coordinador',
   DIRECTOR: 'Director',

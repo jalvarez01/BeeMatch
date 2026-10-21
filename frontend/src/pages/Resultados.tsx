@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { esperarResultado, marcarPreseleccion, obtenerResultados } from '../api/busquedas'
+import {
+  ejecutarBusqueda,
+  esperaCancelada,
+  esperarResultado,
+  etapaPorDefecto,
+  marcarPreseleccion,
+  obtenerResultados,
+} from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
-import { AfinidadBadge, Tag } from '../components/Badges'
+import { AfinidadBadge, AfinidadPorcentaje, LeyendaAfinidad, Tag } from '../components/Badges'
 import BarraProgreso from '../components/BarraProgreso'
+import EstadoVacio from '../components/EstadoVacio'
 import { IconSpark } from '../components/Icons'
 import type { BusquedaResultado, Solicitud } from '../types'
+
+const MENSAJE_SIN_CANDIDATOS = 'No se encontraron candidatos afines al perfil solicitado'
 
 /** HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
 export default function Resultados() {
@@ -20,33 +30,72 @@ export default function Resultados() {
   const [progreso, setProgreso] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
+
+  // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
+  // análisis anterior en vez de dejarlo corriendo en segundo plano.
+  const control = useRef<AbortController | null>(null)
 
   const cargar = useCallback(async () => {
+    control.current?.abort()
+    const actual = new AbortController()
+    control.current = actual
+
     setCargando(true)
     setError('')
+    setEtapa('Preparando la consulta')
+    setProgreso(0)
     try {
       const inicial = await obtenerResultados(busquedaId)
+      setSolicitudIdReintento(inicial.solicitud_id)
 
       const final =
         inicial.estado === 'COMPLETADA'
           ? inicial
-          : await esperarResultado(busquedaId, (estado) => {
-              setEtapa(estado.etapa ?? 'Analizando')
-              setProgreso(estado.progreso)
-            })
+          : await esperarResultado(
+              busquedaId,
+              (estado) => {
+                setEtapa(estado.etapa ?? etapaPorDefecto(estado.estado))
+                setProgreso(estado.progreso)
+              },
+              { signal: actual.signal },
+            )
 
+      const solicitudDeLaBusqueda = await obtenerSolicitud(final.solicitud_id)
+      if (actual.signal.aborted) return
       setResultado(final)
-      setSolicitud(await obtenerSolicitud(final.solicitud_id))
+      setSolicitud(solicitudDeLaBusqueda)
     } catch (e) {
+      if (esperaCancelada(e) || actual.signal.aborted) return
       setError((e as Error).message)
     } finally {
-      setCargando(false)
+      if (!actual.signal.aborted) setCargando(false)
     }
   }, [busquedaId])
 
   useEffect(() => {
     void cargar()
+    return () => control.current?.abort()
   }, [cargar])
+
+  const reintentar = async () => {
+    if (!solicitudIdReintento) {
+      await cargar()
+      return
+    }
+
+    setCargando(true)
+    setError('')
+
+    try {
+      const nuevaBusqueda = await ejecutarBusqueda(solicitudIdReintento)
+      navegar(`/resultados/${nuevaBusqueda.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCargando(false)
+    }
+  }
 
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {
     const actualizada = await marcarPreseleccion(recomendacionId, valor)
@@ -79,8 +128,12 @@ export default function Resultados() {
     return (
       <>
         <div className="bm-alert bm-alert-error">{error}</div>
-        <button className="bm-btn bm-btn-ghost" onClick={() => void cargar()}>
-          Reintentar
+        <button
+          className="bm-btn bm-btn-ghost"
+          onClick={() => void reintentar()}
+          disabled={cargando}
+        >
+          {cargando ? 'Reintentando...' : 'Reintentar'}
         </button>
       </>
     )
@@ -131,36 +184,52 @@ export default function Resultados() {
         </span>
       </div>
 
-      <div className="bm-row-between" style={{ marginBottom: 14 }}>
-        <div>
-          <h2 className="bm-h2" style={{ margin: 0 }}>
-            Candidatos recomendados
-          </h2>
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-            Ordenados de mayor a menor afinidad con los criterios de la solicitud.
-          </p>
+      {resultado.recomendaciones.length > 0 && (
+        <div className="bm-row-between" style={{ marginBottom: 14 }}>
+          <div>
+            <h2 className="bm-h2" style={{ margin: 0 }}>
+              Candidatos recomendados
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+              Ordenados de mayor a menor afinidad con los criterios de la solicitud.
+            </p>
+            <LeyendaAfinidad />
+          </div>
+          <button className="bm-btn bm-btn-dark" onClick={exportar}>
+            Exportar preselección
+          </button>
         </div>
-        <button className="bm-btn bm-btn-dark" onClick={exportar}>
-          Exportar preselección
-        </button>
-      </div>
+      )}
 
       {resultado.recomendaciones.length === 0 && (
-        <div className="bm-card">
-          <div className="bm-empty">
-            <h3>Ningún candidato superó el nivel mínimo de afinidad</h3>
-            <p>
-              Prueba ampliando los criterios o bajando la experiencia mínima. Se analizaron{' '}
-              {resultado.cv_analizados} hojas de vida.
-            </p>
-          </div>
-        </div>
+        // HU-23: el mensaje es explícito y sugiere flexibilizar la búsqueda.
+        <EstadoVacio
+          titulo={MENSAJE_SIN_CANDIDATOS}
+          texto={
+            `Se analizaron ${resultado.cv_analizados} hojas de vida y ninguna alcanzó el nivel ` +
+            'mínimo de afinidad. Te sugerimos ajustar o flexibilizar los criterios de búsqueda: ' +
+            'marca menos requisitos como obligatorios, amplía las tecnologías aceptadas o baja ' +
+            'la experiencia mínima.'
+          }
+          accion={
+            <button
+              className="bm-btn bm-btn-primary"
+              onClick={() => navegar(`/nueva-busqueda?solicitud=${resultado.solicitud_id}`)}
+            >
+              Ajustar criterios de búsqueda
+            </button>
+          }
+        />
       )}
 
       {resultado.recomendaciones.map((candidato) => (
         <article className="bm-cand" key={candidato.id}>
           <div className="score">
-            <div className="p">{candidato.puntaje_afinidad}%</div>
+            <AfinidadPorcentaje
+              className="p"
+              puntaje={candidato.puntaje_afinidad}
+              nivel={candidato.nivel}
+            />
             <AfinidadBadge nivel={candidato.nivel} />
           </div>
 

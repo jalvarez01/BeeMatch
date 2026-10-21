@@ -19,8 +19,12 @@ from typing import Optional
 import httpx
 
 from backend.infrastructure.repositorio.base import (
+    DOC_DISPONIBLE,
+    DOC_ELIMINADO,
+    DOC_MOVIDO,
     CredencialesInvalidasError,
     DocumentoRepositorio,
+    EstadoDocumento,
     RepositorioDocumentos,
     RepositorioError,
     RepositorioNoEncontradoError,
@@ -123,6 +127,11 @@ class GoogleDriveClient(RepositorioDocumentos):
                 info, scopes=DRIVE_SCOPES
             )
             credenciales.refresh(_TransporteHttpx())
+        except httpx.HTTPError as exc:
+            # HU-05, criterio 4: sin respuesta de Google las credenciales no
+            # fueron juzgadas. Reportarlas como inválidas llevaría al
+            # administrador a rotar una llave que estaba bien.
+            raise RepositorioError(f"No fue posible contactar a Google: {exc}") from exc
         except Exception as exc:  # google-auth agrupa todo en excepciones propias
             raise CredencialesInvalidasError(self._describir_error_token(exc)) from exc
 
@@ -319,6 +328,61 @@ class GoogleDriveClient(RepositorioDocumentos):
             {"fields": "mimeType", "supportsAllDrives": "true"},
         )
         return cuerpo.get("mimeType", "")
+
+    # --- Disponibilidad de un documento (HU-21) --------------------------------
+
+    def consultar_documento(self, id_documento: str) -> EstadoDocumento:
+        """
+        Estado de un documento ya indexado, consultado por su ID.
+
+        - 404, o en la papelera: ELIMINADO. Con una cuenta de servicio, un
+          archivo que salió de la carpeta compartida también responde 404, así
+          que desde aquí "movido fuera" y "eliminado" no se distinguen.
+        - Sigue accesible pero ya no está en la carpeta configurada: MOVIDO.
+        - Cualquier otro fallo (red, credenciales, cuota) se propaga como
+          RepositorioError: no se afirma que el archivo desapareció.
+        """
+        try:
+            respuesta = httpx.get(
+                f"{DRIVE_BASE}/files/{id_documento}",
+                params={"fields": "id,trashed,parents", "supportsAllDrives": "true"},
+                headers=self._headers(),
+                timeout=30,
+            )
+        except httpx.HTTPError as exc:
+            raise RepositorioError(f"Error de red consultando Google Drive: {exc}") from exc
+
+        if respuesta.status_code == 404:
+            return EstadoDocumento(estado=DOC_ELIMINADO)
+        if respuesta.status_code == 401:
+            raise CredencialesInvalidasError("Google rechazó el token de la cuenta de servicio.")
+        if respuesta.status_code == 403:
+            raise SinPermisoLecturaError(self._describir_error_403(respuesta))
+        if respuesta.status_code >= 400:
+            raise RepositorioError(f"Google Drive respondió HTTP {respuesta.status_code}.")
+
+        cuerpo = respuesta.json()
+        if cuerpo.get("trashed"):
+            return EstadoDocumento(estado=DOC_ELIMINADO)
+
+        # Sin el campo `parents` (algunos archivos compartidos no lo exponen) no
+        # hay evidencia de que se haya movido: se da por disponible.
+        padres = cuerpo.get("parents")
+        if padres is not None and self.folder_id not in padres:
+            return EstadoDocumento(estado=DOC_MOVIDO)
+
+        return EstadoDocumento(estado=DOC_DISPONIBLE, ruta_legible=self._nombre_carpeta())
+
+    def _nombre_carpeta(self) -> Optional[str]:
+        """Nombre de la carpeta configurada. Si no se puede leer, None (no es un error)."""
+        try:
+            cuerpo = self._get(
+                f"{DRIVE_BASE}/files/{self.folder_id}",
+                {"fields": "name", "supportsAllDrives": "true"},
+            )
+        except RepositorioError:
+            return None
+        return cuerpo.get("name") or None
 
     # --- HTTP ----------------------------------------------------------------
 
