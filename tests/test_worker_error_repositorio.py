@@ -42,6 +42,9 @@ def test_error_repositorio_marca_busqueda_y_cierra_sesion(
         raise error
 
     monkeypatch.setattr(busqueda_worker, "SessionLocal", lambda: db)
+    # HU-22: el paso previo que marca "Sincronizando" necesita la base real; aquí
+    # solo interesa qué pasa cuando falla la sincronización.
+    monkeypatch.setattr(busqueda_worker, "_marcar_sincronizacion", lambda sesion, busqueda_id: True)
     monkeypatch.setattr(
         busqueda_worker,
         "_sincronizar_repositorio",
