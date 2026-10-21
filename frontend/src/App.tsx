@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Historial from './pages/Historial'
 import Login from './pages/Login'
 import NuevaBusqueda from './pages/NuevaBusqueda'
+import Registro from './pages/Registro'
 import Resultados from './pages/Resultados'
 import Solicitudes from './pages/Solicitudes'
 import Usuarios from './pages/Usuarios'
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/registro" element={<Registro />} />
 
       <Route element={<Layout />}>
         <Route path="/inicio" element={<Dashboard />} />
@@ -27,6 +29,7 @@ export default function App() {
         <Route path="/resultados/:busquedaId" element={<Resultados />} />
         <Route path="/candidato/:recomendacionId" element={<Candidato />} />
         <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="/usuarios" element={<Usuarios />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/inicio" replace />} />

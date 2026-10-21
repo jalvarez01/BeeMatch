@@ -26,7 +26,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_HORAS, JWT_SECRET
+from backend.config import JWT_ALGORITHM, JWT_EXPIRACION_MINUTOS, JWT_SECRET
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from types import SimpleNamespace
@@ -36,7 +36,21 @@ security_scheme = HTTPBearer(auto_error=False)
 ROL_COORDINADOR = "COORDINADOR"
 ROL_DIRECTOR = "DIRECTOR"
 ROL_ADMINISTRADOR = "ADMINISTRADOR"
-ROLES_VALIDOS = {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR}
+ROL_SUPERADMINISTRADOR = "SUPERADMINISTRADOR"
+ROLES_VALIDOS = {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR, ROL_SUPERADMINISTRADOR}
+
+# HU-03: roles que un actor puede otorgar o retirar. La superusuaria nunca
+# aparece como objetivo: su rol no se puede dar ni quitar desde la aplicación,
+# así que ningún administrador, por poderoso que sea, llega a igualarla.
+ROLES_QUE_GESTIONA = {
+    ROL_SUPERADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR},
+    ROL_ADMINISTRADOR: {ROL_COORDINADOR, ROL_DIRECTOR},
+}
+
+
+def puede_gestionar(actor_rol: str, objetivo_rol: str) -> bool:
+    """¿Puede `actor_rol` editar o inactivar a un usuario con `objetivo_rol`?"""
+    return objetivo_rol in ROLES_QUE_GESTIONA.get(actor_rol, set())
 
 # --- Contraseñas -------------------------------------------------------------
 
@@ -108,7 +122,7 @@ def crear_token(usuario_id: str, correo: str, rol: str) -> str:
         "correo": correo,
         "rol": rol,
         "iat": datetime.now(UTC),
-        "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRACION_HORAS),
+        "exp": datetime.now(UTC) + timedelta(minutes=JWT_EXPIRACION_MINUTOS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -166,7 +180,8 @@ def exigir_rol(*roles: str):
     """Restringe un endpoint a ciertos roles (RNF08)."""
 
     def _verificar(current_user=Depends(get_current_user)):
-        if current_user.rol not in roles:
+        # La superusuaria tiene todos los permisos (HU-03).
+        if current_user.rol != ROL_SUPERADMINISTRADOR and current_user.rol not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso para realizar esta acción.",

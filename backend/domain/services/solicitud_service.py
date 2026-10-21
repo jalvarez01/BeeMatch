@@ -29,16 +29,38 @@ MENSAJE_DESCRIPCION_CORTA = (
 )
 
 
+CAMPO_DESCRIPCION = "descripción del perfil"
+CAMPO_ROL = "rol requerido"
+
+
 def descripcion_insuficiente(descripcion: Optional[str]) -> bool:
     """
     HU-08: un texto libre que se escribió pero quedó por debajo del mínimo no le
     da contexto suficiente al servicio de IA.
 
     El texto vacío no entra aquí: lo resuelve la validación de campos
-    obligatorios (HU-10), que también permite buscar solo con el rol.
+    obligatorios (HU-10, `campos_faltantes`).
     """
     texto = (descripcion or "").strip()
     return 0 < len(texto) < DESCRIPCION_MIN_CARACTERES
+
+
+def campos_faltantes(descripcion: Optional[str], rol: Optional[str]) -> list[str]:
+    """
+    HU-10: sin rol o sin descripción del perfil la búsqueda daría resultados
+    poco útiles, así que no se ejecuta. Devuelve los campos que faltan, en el
+    orden en que aparecen en el formulario.
+    """
+    faltantes = []
+    if not (descripcion or "").strip():
+        faltantes.append(CAMPO_DESCRIPCION)
+    if not (rol or "").strip():
+        faltantes.append(CAMPO_ROL)
+    return faltantes
+
+
+def mensaje_campos_faltantes(faltantes: list[str]) -> str:
+    return f"Completa la información obligatoria para buscar: {' y '.join(faltantes)}."
 
 
 class SolicitudService:

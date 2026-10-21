@@ -35,51 +35,6 @@ def test_no_se_puede_quitar_el_rol_al_ultimo_administrador(db, administrador):
     assert error.value.status_code == 400
     assert db.get(UsuarioModel, administrador.id).rol == ROL_ADMINISTRADOR
 
-def test_se_puede_quitar_el_rol_si_hay_otro_administrador_activo(db, administrador):
-    segundo_admin = UsuarioModel(
-        nombre="Segundo administrador",
-        correo="admin2@beematch.test",
-        rol=ROL_ADMINISTRADOR,
-        activo=True,
-    )
-    db.add(segundo_admin)
-    db.commit()
-    db.refresh(segundo_admin)
-
-    actualizado = actualizar_usuario(
-        usuario_id=segundo_admin.id,
-        datos=UsuarioUpdate(rol="COORDINADOR"),
-        db=db,
-        current_user=administrador,
-    )
-
-    assert actualizado.rol == "COORDINADOR"
-    assert administrador.activo is True
-    assert administrador.rol == ROL_ADMINISTRADOR
-
-
-def test_se_puede_desactivar_un_admin_si_hay_otro_activo(db, administrador):
-    segundo_admin = UsuarioModel(
-        nombre="Segundo administrador",
-        correo="admin2@beematch.test",
-        rol=ROL_ADMINISTRADOR,
-        activo=True,
-    )
-    db.add(segundo_admin)
-    db.commit()
-    db.refresh(segundo_admin)
-
-    actualizado = actualizar_usuario(
-        usuario_id=segundo_admin.id,
-        datos=UsuarioUpdate(activo=False),
-        db=db,
-        current_user=administrador,
-    )
-
-    assert actualizado.activo is False
-    assert administrador.activo is True
-    assert administrador.rol == ROL_ADMINISTRADOR
-
 def test_el_rol_del_token_se_conserva_durante_la_sesion(db, administrador):
     from backend.security import crear_token, get_current_user
 

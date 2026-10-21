@@ -22,16 +22,37 @@ const NAV_POR_ROL: Record<Rol, { ruta: string; etiqueta: string }[]> = {
     { ruta: '/candidatos', etiqueta: 'Candidatos' },
     { ruta: '/historial', etiqueta: 'Historial' },
   ],
+  SUPERADMINISTRADOR: [
+    { ruta: '/inicio', etiqueta: 'Inicio' },
+    { ruta: '/nueva-busqueda', etiqueta: 'Nueva búsqueda' },
+    { ruta: '/solicitudes', etiqueta: 'Solicitudes' },
+    { ruta: '/usuarios', etiqueta: 'Usuarios' },
+    { ruta: '/candidatos', etiqueta: 'Candidatos' },
+    { ruta: '/historial', etiqueta: 'Historial' },
+  ],
 }
+
+/** HU-03-CP5: el módulo de usuarios solo lo ven quienes administran. */
+const ROLES_QUE_ADMINISTRAN = ['ADMINISTRADOR', 'SUPERADMINISTRADOR']
 
 export default function Sidebar() {
   const navegar = useNavigate()
   const sesion = leerSesion<Sesion>()
   const rol = sesion?.usuario?.rol
-  const nav = rol ? NAV_POR_ROL[rol] : []
+  const navBase = rol ? NAV_POR_ROL[rol] : []
+  const puedeAdministrar =
+    rol !== undefined && ROLES_QUE_ADMINISTRAN.includes(rol)
 
-  const salir = () => {
-    cerrarSesion()
+  const nav = puedeAdministrar
+    ? [
+        ...navBase.filter((item) => item.ruta !== '/usuarios'),
+        { ruta: '/usuarios', etiqueta: 'Usuarios' },
+      ]
+    : navBase
+
+  const salir = async () => {
+    await cerrarSesion()
+    // `replace` saca la pantalla del historial: el botón atrás ya no la muestra.
     navegar('/login', { replace: true })
   }
 

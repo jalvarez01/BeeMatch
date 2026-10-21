@@ -7,11 +7,18 @@ import { actualizarSolicitud, crearSolicitud, obtenerSolicitud } from '../api/so
 import { IconSpark } from '../components/Icons'
 import type { Criterio, SolicitudPayload, TipoCriterio } from '../types'
 
-const EXPERIENCIAS = [1, 3, 5, 8]
-
 const DESCRIPCION_MIN = 15
 const DESCRIPCION_MAX = 1000
+const EXPERIENCIA_MAX = 50
 const MENSAJE_DESCRIPCION_CORTA = `La descripción es muy corta. Describe el perfil con más detalle (mínimo ${DESCRIPCION_MIN} caracteres).`
+const MENSAJE_DESCRIPCION_VACIA = 'Falta la descripción del perfil. Cuéntale a BeeMatch qué perfil necesitas.'
+const MENSAJE_ROL_VACIO = 'Falta el rol requerido. Escríbelo o elige uno de la lista.'
+const MENSAJE_EXPERIENCIA = `Ingresa solo números enteros positivos (de 1 a ${EXPERIENCIA_MAX} años).`
+
+/** HU-10: campos que se validan antes de buscar, en el orden del formulario. */
+type CampoValidado = 'descripcion' | 'rol' | 'experiencia'
+type ErroresSolicitud = Partial<Record<CampoValidado, string>>
+const ORDEN_CAMPOS: CampoValidado[] = ['descripcion', 'rol', 'experiencia']
 
 /** HU-08, HU-09, HU-10, HU-11, HU-12, HU-15. */
 export default function NuevaBusqueda() {
@@ -20,8 +27,10 @@ export default function NuevaBusqueda() {
   const solicitudId = params.get('solicitud')
 
   const [descripcion, setDescripcion] = useState('')
-  const [errorDescripcion, setErrorDescripcion] = useState('')
+  const [errores, setErrores] = useState<ErroresSolicitud>({})
   const campoDescripcion = useRef<HTMLTextAreaElement>(null)
+  const campoRol = useRef<HTMLInputElement>(null)
+  const campoExperiencia = useRef<HTMLInputElement>(null)
   const [cliente, setCliente] = useState('')
   const [proyecto, setProyecto] = useState('')
   const [rol, setRol] = useState('')
@@ -73,8 +82,29 @@ export default function NuevaBusqueda() {
     }
   }
 
+  /**
+   * HU-10: marca los campos con error y lleva el foco al primero. Un borrador
+   * puede quedar incompleto; una búsqueda necesita rol y descripción.
+   */
+  const validar = (paraBuscar: boolean): boolean => {
+    const encontrados = validarSolicitud(descripcion, rol, experiencia, paraBuscar)
+    setErrores(encontrados)
+    const primero = ORDEN_CAMPOS.find((campo) => encontrados[campo])
+    if (!primero) return true
+    const referencias = { descripcion: campoDescripcion, rol: campoRol, experiencia: campoExperiencia }
+    referencias[primero].current?.focus()
+    return false
+  }
+
+  const marcarError = (campo: CampoValidado, mensaje?: string) =>
+    setErrores((actuales) => ({ ...actuales, [campo]: mensaje }))
+
+  const atributosDeError = (campo: CampoValidado) =>
+    errores[campo] ? { 'aria-invalid': true, 'aria-describedby': `${campo}-error` } : {}
+
   const guardarBorrador = async () => {
     setError('')
+    if (!validar(false)) return
     try {
       const solicitud = solicitudId
         ? await actualizarSolicitud(solicitudId, construirPayload())
@@ -87,11 +117,7 @@ export default function NuevaBusqueda() {
 
   const buscar = async () => {
     setError('')
-    if (descripcionMuyCorta(descripcion)) {
-      setErrorDescripcion(MENSAJE_DESCRIPCION_CORTA)
-      campoDescripcion.current?.focus()
-      return
-    }
+    if (!validar(true)) return
     setEnviando(true)
     try {
       const solicitud = solicitudId
@@ -134,18 +160,14 @@ export default function NuevaBusqueda() {
           disabled={enviando}
           onChange={(e) => {
             setDescripcion(e.target.value)
-            setErrorDescripcion('')
+            marcarError('descripcion')
           }}
-          data-error={errorDescripcion ? 'true' : undefined}
-          aria-invalid={errorDescripcion ? true : undefined}
-          aria-describedby={errorDescripcion ? 'descripcion-error' : undefined}
+          aria-required="true"
+          data-error={errores.descripcion ? 'true' : undefined}
+          {...atributosDeError('descripcion')}
           placeholder="Ej. Necesito un desarrollador Backend Java Senior con mínimo 5 años de experiencia, conocimientos en Spring Boot y AWS, experiencia en el sector bancario e inglés B2."
         />
-        {errorDescripcion && (
-          <div id="descripcion-error" className="bm-error" role="alert">
-            {errorDescripcion}
-          </div>
-        )}
+        <MensajeError id="descripcion-error" mensaje={errores.descripcion} />
         <div className="bm-count">{descripcion.length}/{DESCRIPCION_MAX}</div>
       </div>
 
@@ -177,44 +199,64 @@ export default function NuevaBusqueda() {
           />
         </div>
 
-        <div className="bm-field">
-          <label htmlFor="rol">Rol requerido</label>
-          {/*
-            Texto libre, no una lista cerrada: el rol no filtra en SQL, se suma
-            a la consulta que resuelven los embeddings y el re-ranking, así que
-            acepta cualquier cargo. La lista solo sugiere los que la IA ya
-            identificó en las hojas de vida del repositorio.
-          */}
-          <input
-            id="rol"
-            list="roles-sugeridos"
-            placeholder="Escribir o elegir rol"
-            value={rol}
-            disabled={enviando}
-            onChange={(e) => setRol(e.target.value)}
-          />
-          <datalist id="roles-sugeridos">
-            {roles.map((r) => (
-              <option key={r} value={r} />
-            ))}
-          </datalist>
+        <div>
+          <div className="bm-field" data-error={errores.rol ? 'true' : undefined}>
+            <label htmlFor="rol">Rol requerido</label>
+            {/*
+              Texto libre, no una lista cerrada: el rol no filtra en SQL, se suma
+              a la consulta que resuelven los embeddings y el re-ranking, así que
+              acepta cualquier cargo. La lista solo sugiere los que la IA ya
+              identificó en las hojas de vida del repositorio.
+            */}
+            <input
+              id="rol"
+              ref={campoRol}
+              list="roles-sugeridos"
+              placeholder="Escribir o elegir rol"
+              value={rol}
+              disabled={enviando}
+              onChange={(e) => {
+                setRol(e.target.value)
+                marcarError('rol')
+              }}
+              aria-required="true"
+              {...atributosDeError('rol')}
+            />
+            <datalist id="roles-sugeridos">
+              {roles.map((r) => (
+                <option key={r} value={r} />
+              ))}
+            </datalist>
+          </div>
+          <MensajeError id="rol-error" mensaje={errores.rol} />
         </div>
 
-        <div className="bm-field">
-          <label htmlFor="experiencia">Experiencia mínima</label>
-          <select
-            id="experiencia"
-            value={experiencia}
-            disabled={enviando}
-            onChange={(e) => setExperiencia(e.target.value === '' ? '' : Number(e.target.value))}
-          >
-            <option value="">Seleccionar exp</option>
-            {EXPERIENCIAS.map((n) => (
-              <option key={n} value={n}>
-                {n}+ años
-              </option>
-            ))}
-          </select>
+        <div>
+          <div className="bm-field" data-error={errores.experiencia ? 'true' : undefined}>
+            <label htmlFor="experiencia">Experiencia mínima</label>
+            {/*
+              HU-10: solo enteros positivos. Lo que no es dígito no entra al
+              campo y el aviso explica por qué, en vez de ignorar la tecla.
+            */}
+            <input
+              id="experiencia"
+              ref={campoExperiencia}
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="Años, ej. 5"
+              value={experiencia}
+              disabled={enviando}
+              onChange={(e) => {
+                const digitos = e.target.value.replace(/\D/g, '')
+                const valor = digitos === '' ? '' : Number(digitos)
+                setExperiencia(valor)
+                const valido = digitos === e.target.value && experienciaValida(valor)
+                marcarError('experiencia', valido ? undefined : MENSAJE_EXPERIENCIA)
+              }}
+              {...atributosDeError('experiencia')}
+            />
+          </div>
+          <MensajeError id="experiencia-error" mensaje={errores.experiencia} />
         </div>
 
         <CampoChips
@@ -265,6 +307,36 @@ function criterio(valor: string, tipo: TipoCriterio): Criterio {
 function descripcionMuyCorta(descripcion: string): boolean {
   const texto = descripcion.trim()
   return texto.length > 0 && texto.length < DESCRIPCION_MIN
+}
+
+/** HU-10: vacío es válido (no exige mínimo); si hay valor, entero entre 1 y el máximo. */
+function experienciaValida(experiencia: number | ''): boolean {
+  return experiencia === '' || (Number.isInteger(experiencia) && experiencia > 0 && experiencia <= EXPERIENCIA_MAX)
+}
+
+function validarSolicitud(
+  descripcion: string,
+  rol: string,
+  experiencia: number | '',
+  paraBuscar: boolean,
+): ErroresSolicitud {
+  const errores: ErroresSolicitud = {}
+  if (paraBuscar) {
+    if (!descripcion.trim()) errores.descripcion = MENSAJE_DESCRIPCION_VACIA
+    else if (descripcionMuyCorta(descripcion)) errores.descripcion = MENSAJE_DESCRIPCION_CORTA
+    if (!rol.trim()) errores.rol = MENSAJE_ROL_VACIO
+  }
+  if (!experienciaValida(experiencia)) errores.experiencia = MENSAJE_EXPERIENCIA
+  return errores
+}
+
+function MensajeError({ id, mensaje }: { id: string; mensaje?: string }) {
+  if (!mensaje) return null
+  return (
+    <div id={id} className="bm-error" role="alert">
+      {mensaje}
+    </div>
+  )
 }
 
 function CampoChips({

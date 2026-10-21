@@ -1,11 +1,21 @@
 import type { Rol, Usuario } from '../types'
 import { apiFetch } from './client'
 
+/** HU-03 y HU-04: gestión de usuarios. */
+
 export interface CrearUsuarioPayload {
   nombre: string
   correo: string
   password: string
-  rol: Rol
+  rol: Exclude<Rol, 'SUPERADMINISTRADOR'>
+}
+
+export interface CambiosUsuario {
+  nombre?: string
+  correo?: string
+  rol?: Exclude<Rol, 'SUPERADMINISTRADOR'>
+  /** `true` aprueba una cuenta pendiente o reactiva; `false` inactiva. */
+  activo?: boolean
 }
 
 export async function listarUsuarios(): Promise<Usuario[]> {
@@ -23,10 +33,10 @@ export async function crearUsuario(
 
 export async function actualizarUsuario(
   id: string,
-  datos: { rol?: Rol; activo?: boolean },
+  cambios: CambiosUsuario,
 ): Promise<Usuario> {
   return apiFetch<Usuario>(`/auth/usuarios/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(datos),
+    body: JSON.stringify(cambios),
   })
 }

@@ -73,7 +73,7 @@ class BusquedaService:
 
             criterios = self.solicitudes.listar_criterios(solicitud.id)
             consulta = self._construir_consulta(solicitud, criterios)
-            requisitos = [c.valor for c in criterios]
+            requisitos = self._construir_requisitos(solicitud, criterios)
 
             # Etapa 1: recuperación híbrida
             self.busquedas.actualizar_progreso(busqueda_id, "Buscando en las hojas de vida", 35)
@@ -160,6 +160,19 @@ class BusquedaService:
         if criterios:
             partes.append("Requisitos: " + ", ".join(c.valor for c in criterios))
         return "\n".join(p for p in partes if p)
+
+    def _construir_requisitos(self, solicitud, criterios) -> list[str]:
+        """
+        HU-19: el rol y la experiencia mínima se evalúan uno a uno junto con los
+        criterios, para que la explicación diga si la hoja de vida los respalda.
+        """
+        requisitos = []
+        if solicitud.rol_buscado:
+            requisitos.append(solicitud.rol_buscado)
+        if solicitud.experiencia_min:
+            requisitos.append(f"{solicitud.experiencia_min}+ años de experiencia")
+        requisitos.extend(c.valor for c in criterios)
+        return requisitos
 
     def _agrupar_por_candidato(self, fragmentos) -> list[dict]:
         """Un candidato entra al re-ranking con sus mejores fragmentos."""

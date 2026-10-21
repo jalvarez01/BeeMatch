@@ -123,6 +123,11 @@ class GoogleDriveClient(RepositorioDocumentos):
                 info, scopes=DRIVE_SCOPES
             )
             credenciales.refresh(_TransporteHttpx())
+        except httpx.HTTPError as exc:
+            # HU-05, criterio 4: sin respuesta de Google las credenciales no
+            # fueron juzgadas. Reportarlas como inválidas llevaría al
+            # administrador a rotar una llave que estaba bien.
+            raise RepositorioError(f"No fue posible contactar a Google: {exc}") from exc
         except Exception as exc:  # google-auth agrupa todo en excepciones propias
             raise CredencialesInvalidasError(self._describir_error_token(exc)) from exc
 
