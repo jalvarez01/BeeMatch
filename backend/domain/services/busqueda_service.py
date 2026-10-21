@@ -32,7 +32,11 @@ from backend.infrastructure.persistence.models.hoja_vida import (
     ESTADO_INDEXADA,
     ESTADO_NO_PROCESABLE,
 )
-from backend.infrastructure.persistence.models.solicitud import ESTADO_ERROR, ESTADO_PROCESADA
+from backend.infrastructure.persistence.models.solicitud import (
+    ESTADO_ERROR,
+    ESTADO_PROCESADA,
+    ESTADO_SIN_COINCIDENCIAS,
+)
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
@@ -83,7 +87,7 @@ class BusquedaService:
 
             criterios = self.solicitudes.listar_criterios(solicitud.id)
             consulta = self._construir_consulta(solicitud, criterios)
-            requisitos = [c.valor for c in criterios]
+            requisitos = self._construir_requisitos(solicitud, criterios)
 
             # Etapa 1: recuperación híbrida
             self.busquedas.actualizar_progreso(busqueda_id, "Buscando en las hojas de vida", 35)
@@ -130,7 +134,11 @@ class BusquedaService:
                 tokens_entrada=respuesta_ia.tokens_entrada,
                 tokens_salida=respuesta_ia.tokens_salida,
             )
-            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_PROCESADA)
+            # HU-23: hubo finalistas, pero si ninguno superó el umbral la
+            # solicitud queda en el historial como "Sin coincidencias".
+            self.solicitudes.cambiar_estado(
+                solicitud.id, ESTADO_PROCESADA if recomendaciones else ESTADO_SIN_COINCIDENCIAS
+            )
 
         except ProveedorEmbeddingsNoDisponibleError as exc:
             # Mismo trato que un fallo del LLM: es una pieza del sistema que
@@ -158,6 +166,19 @@ class BusquedaService:
         if criterios:
             partes.append("Requisitos: " + ", ".join(c.valor for c in criterios))
         return "\n".join(p for p in partes if p)
+
+    def _construir_requisitos(self, solicitud, criterios) -> list[str]:
+        """
+        HU-19: el rol y la experiencia mínima se evalúan uno a uno junto con los
+        criterios, para que la explicación diga si la hoja de vida los respalda.
+        """
+        requisitos = []
+        if solicitud.rol_buscado:
+            requisitos.append(solicitud.rol_buscado)
+        if solicitud.experiencia_min:
+            requisitos.append(f"{solicitud.experiencia_min}+ años de experiencia")
+        requisitos.extend(c.valor for c in criterios)
+        return requisitos
 
     def _agrupar_por_candidato(self, fragmentos) -> list[dict]:
         """Un candidato entra al re-ranking con sus mejores fragmentos."""
@@ -193,4 +214,4 @@ class BusquedaService:
             cv_analizados=self.hojas.contar_por_estado(ESTADO_INDEXADA),
             cv_no_procesables=self.hojas.contar_por_estado(ESTADO_NO_PROCESABLE),
         )
-        self.solicitudes.cambiar_estado(solicitud_id, ESTADO_PROCESADA)
+        self.solicitudes.cambiar_estado(solicitud_id, ESTADO_SIN_COINCIDENCIAS)

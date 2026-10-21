@@ -10,10 +10,13 @@ import {
 } from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
-import { AfinidadBadge, Tag } from '../components/Badges'
+import { AfinidadBadge, AfinidadPorcentaje, LeyendaAfinidad, Tag } from '../components/Badges'
 import BarraProgreso from '../components/BarraProgreso'
+import EstadoVacio from '../components/EstadoVacio'
 import { IconSpark } from '../components/Icons'
 import type { BusquedaResultado, Solicitud } from '../types'
+
+const MENSAJE_SIN_CANDIDATOS = 'No se encontraron candidatos afines al perfil solicitado'
 
 /** HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
 export default function Resultados() {
@@ -155,36 +158,52 @@ export default function Resultados() {
         </span>
       </div>
 
-      <div className="bm-row-between" style={{ marginBottom: 14 }}>
-        <div>
-          <h2 className="bm-h2" style={{ margin: 0 }}>
-            Candidatos recomendados
-          </h2>
-          <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-            Ordenados de mayor a menor afinidad con los criterios de la solicitud.
-          </p>
+      {resultado.recomendaciones.length > 0 && (
+        <div className="bm-row-between" style={{ marginBottom: 14 }}>
+          <div>
+            <h2 className="bm-h2" style={{ margin: 0 }}>
+              Candidatos recomendados
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+              Ordenados de mayor a menor afinidad con los criterios de la solicitud.
+            </p>
+            <LeyendaAfinidad />
+          </div>
+          <button className="bm-btn bm-btn-dark" onClick={exportar}>
+            Exportar preselección
+          </button>
         </div>
-        <button className="bm-btn bm-btn-dark" onClick={exportar}>
-          Exportar preselección
-        </button>
-      </div>
+      )}
 
       {resultado.recomendaciones.length === 0 && (
-        <div className="bm-card">
-          <div className="bm-empty">
-            <h3>Ningún candidato superó el nivel mínimo de afinidad</h3>
-            <p>
-              Prueba ampliando los criterios o bajando la experiencia mínima. Se analizaron{' '}
-              {resultado.cv_analizados} hojas de vida.
-            </p>
-          </div>
-        </div>
+        // HU-23: el mensaje es explícito y sugiere flexibilizar la búsqueda.
+        <EstadoVacio
+          titulo={MENSAJE_SIN_CANDIDATOS}
+          texto={
+            `Se analizaron ${resultado.cv_analizados} hojas de vida y ninguna alcanzó el nivel ` +
+            'mínimo de afinidad. Te sugerimos ajustar o flexibilizar los criterios de búsqueda: ' +
+            'marca menos requisitos como obligatorios, amplía las tecnologías aceptadas o baja ' +
+            'la experiencia mínima.'
+          }
+          accion={
+            <button
+              className="bm-btn bm-btn-primary"
+              onClick={() => navegar(`/nueva-busqueda?solicitud=${resultado.solicitud_id}`)}
+            >
+              Ajustar criterios de búsqueda
+            </button>
+          }
+        />
       )}
 
       {resultado.recomendaciones.map((candidato) => (
         <article className="bm-cand" key={candidato.id}>
           <div className="score">
-            <div className="p">{candidato.puntaje_afinidad}%</div>
+            <AfinidadPorcentaje
+              className="p"
+              puntaje={candidato.puntaje_afinidad}
+              nivel={candidato.nivel}
+            />
             <AfinidadBadge nivel={candidato.nivel} />
           </div>
 

@@ -6,6 +6,10 @@ NIVEL_ALTA = "ALTA"
 NIVEL_MEDIA = "MEDIA"
 NIVEL_BAJA = "BAJA"
 
+# HU-20: cortes de cada nivel. La leyenda del frontend (Badges.tsx) los repite.
+PUNTAJE_MINIMO_ALTA = 85
+PUNTAJE_MINIMO_MEDIA = 70
+
 
 def normalizar_puntaje(valor: float) -> float:
     """RD6: el puntaje siempre vive entre 0 y 100."""
@@ -13,9 +17,9 @@ def normalizar_puntaje(valor: float) -> float:
 
 
 def nivel_de(puntaje: float) -> str:
-    if puntaje >= 85:
+    if puntaje >= PUNTAJE_MINIMO_ALTA:
         return NIVEL_ALTA
-    if puntaje >= 70:
+    if puntaje >= PUNTAJE_MINIMO_MEDIA:
         return NIVEL_MEDIA
     return NIVEL_BAJA
 

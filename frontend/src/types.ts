@@ -2,7 +2,12 @@
 
 export type Rol = 'COORDINADOR' | 'DIRECTOR' | 'ADMINISTRADOR' | 'SUPERADMINISTRADOR'
 
-export type EstadoSolicitud = 'BORRADOR' | 'EN_ANALISIS' | 'PROCESADA' | 'ERROR'
+export type EstadoSolicitud =
+  | 'BORRADOR'
+  | 'EN_ANALISIS'
+  | 'PROCESADA'
+  | 'SIN_COINCIDENCIAS'
+  | 'ERROR'
 
 export type EstadoBusqueda = 'EN_COLA' | 'EJECUTANDO' | 'COMPLETADA' | 'ERROR'
 

@@ -16,6 +16,8 @@ Reglas estrictas:
 3. Toda coincidencia con estado ENCONTRADO o PARCIAL debe citar el fragmento que la sustenta.
 4. No consideres edad, género, nacionalidad, estado civil ni fotografía. Si aparecen, ignóralos.
 5. El puntaje de afinidad es un entero de 0 a 100.
+6. Evalúa cada requisito de REQUISITOS A EVALUAR y escribe en "requisito" exactamente el mismo texto de la lista. Evalúa también los requisitos explícitos del perfil solicitado que no estén en la lista (tecnologías, frameworks, años de experiencia, idiomas, sector). Cada requisito aparece una sola vez.
+7. El resumen es una explicación en lenguaje natural, de dos o tres frases, dirigida al reclutador: nombra las tecnologías, frameworks y experiencia que coinciden con lo solicitado y menciona los requisitos no evidenciados. Solo presenta como coincidencia lo que tenga un fragmento citado.
 
 Respondes únicamente con JSON válido, sin texto adicional ni marcas de código."""
 
@@ -34,7 +36,7 @@ Devuelve un JSON con esta forma exacta:
     {{
       "candidato_id": "...",
       "puntaje_afinidad": 0,
-      "resumen": "una frase sobre por qué encaja",
+      "resumen": "explicación en lenguaje natural de las coincidencias con el perfil solicitado",
       "coincidencias": [
         {{
           "requisito": "...",

@@ -10,7 +10,9 @@ from backend.domain.services.busqueda_service import BusquedaService
 from backend.domain.services.resultado_service import ResultadoService
 from backend.domain.services.solicitud_service import (
     MENSAJE_DESCRIPCION_CORTA,
+    campos_faltantes,
     descripcion_insuficiente,
+    mensaje_campos_faltantes,
 )
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.models.solicitud import ESTADO_EN_ANALISIS
@@ -44,6 +46,9 @@ def ejecutar(
     solicitud = solicitudes.get_by_id(solicitud_id)
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    faltantes = campos_faltantes(solicitud.descripcion_libre, solicitud.rol_buscado)
+    if faltantes:
+        raise HTTPException(status_code=422, detail=mensaje_campos_faltantes(faltantes))
     if descripcion_insuficiente(solicitud.descripcion_libre):
         raise HTTPException(status_code=422, detail=MENSAJE_DESCRIPCION_CORTA)
 
