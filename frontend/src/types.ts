@@ -100,9 +100,27 @@ export interface Recomendacion {
   anios_experiencia: number | null
   tecnologias: string[]
   ubicacion: string | null
+  nombre_archivo: string | null
   ruta_hoja_vida: string | null
   url_hoja_vida: string | null
   coincidencias: Coincidencia[]
+}
+
+/** HU-21: dónde está la hoja de vida y si el archivo se puede abrir. */
+export type EstadoHojaVida =
+  | 'DISPONIBLE'
+  | 'MOVIDO'
+  | 'ELIMINADO'
+  | 'ENLACE_INVALIDO'
+  | 'NO_VERIFICABLE'
+
+export interface DisponibilidadHojaVida {
+  estado: EstadoHojaVida
+  disponible: boolean
+  mensaje: string | null
+  nombre_archivo: string
+  ruta: string
+  url: string | null
 }
 
 export interface BusquedaEstado {

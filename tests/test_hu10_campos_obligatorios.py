@@ -9,7 +9,7 @@ HU-10, aviso de información indispensable. Criterios de aceptación:
 
 El criterio 3 es de interfaz y se verifica a mano en NuevaBusqueda. Aquí se
 prueba lo que garantiza el servidor aunque alguien llame a la API sin pasar por
-el formulario. El worker no se ejecuta: `encolar` se sustituye por un doble.
+el formulario. El worker no se ejecuta: `despachar` se sustituye por un doble.
 """
 
 import pytest
@@ -39,7 +39,7 @@ def sin_worker(monkeypatch):
     """La búsqueda se encola pero no corre: no hay servicio de IA en las pruebas."""
     import backend.api.busquedas as router
 
-    monkeypatch.setattr(router, "encolar", lambda *args, **kwargs: None)
+    monkeypatch.setattr(router, "despachar", lambda *args, **kwargs: None)
 
 
 def _crear_solicitud(cliente, cabeceras, **datos) -> str:

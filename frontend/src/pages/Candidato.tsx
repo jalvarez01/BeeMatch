@@ -1,24 +1,49 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { marcarPreseleccion, obtenerRecomendacion } from '../api/busquedas'
+import { consultarHojaDeVida, marcarPreseleccion, obtenerRecomendacion } from '../api/busquedas'
 import { AfinidadBadge, AfinidadPorcentaje, Tag } from '../components/Badges'
 import { IconSpark, IconUser } from '../components/Icons'
-import type { Recomendacion } from '../types'
+import type { DisponibilidadHojaVida, Recomendacion } from '../types'
 
-/** HU-19, HU-21, HU-24: explicación con evidencia y ubicación del CV. */
+/** HU-19, HU-21, HU-24: explicación con evidencia y ubicación del CV en el repositorio. */
 export default function Candidato() {
   const { recomendacionId = '' } = useParams()
   const navegar = useNavigate()
 
   const [candidato, setCandidato] = useState<Recomendacion | null>(null)
   const [error, setError] = useState('')
+  // HU-21: null mientras se consulta al repositorio.
+  const [hoja, setHoja] = useState<DisponibilidadHojaVida | null>(null)
 
   useEffect(() => {
     obtenerRecomendacion(recomendacionId)
       .then(setCandidato)
       .catch((e: Error) => setError(e.message))
   }, [recomendacionId])
+
+  // HU-21: se comprueba que el archivo siga en el repositorio antes de ofrecer el enlace.
+  useEffect(() => {
+    if (!candidato) return
+    consultarHojaDeVida(recomendacionId)
+      .then(setHoja)
+      .catch(() => {
+        // Si la comprobación falla no se afirma que el archivo desapareció: se deja
+        // abrir el enlace que ya trae el detalle, si lo hay.
+        setHoja({
+          estado: 'NO_VERIFICABLE',
+          disponible: Boolean(candidato.url_hoja_vida),
+          mensaje: candidato.url_hoja_vida
+            ? 'No se pudo comprobar si el archivo sigue disponible. Puedes intentar abrirlo igualmente.'
+            : 'La hoja de vida no tiene un enlace válido al repositorio.',
+          nombre_archivo: candidato.nombre_archivo ?? '',
+          ruta: candidato.nombre_archivo ?? '',
+          url: candidato.url_hoja_vida,
+        })
+      })
+    // Solo depende de la recomendación: marcar la preselección también cambia `candidato`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recomendacionId, candidato?.id])
 
   const alternar = async () => {
     if (!candidato) return
@@ -85,18 +110,40 @@ export default function Candidato() {
             {candidato.preseleccionado ? 'Preseleccionado' : 'Preseleccionar'}
           </label>
 
-          {/* HU-21: enlace directo al documento en OneDrive. */}
-          <a
-            className="bm-btn bm-btn-dark"
-            href={candidato.url_hoja_vida ?? '#'}
-            target="_blank"
-            rel="noreferrer"
-            title={candidato.ruta_hoja_vida ?? ''}
-          >
-            Ver hoja de vida ↗
-          </a>
+          {/* HU-21: enlace al documento en el repositorio, solo si el archivo sigue ahí. */}
+          {hoja === null && (
+            <span className="bm-btn bm-btn-soft" aria-busy="true">
+              Verificando documento…
+            </span>
+          )}
+          {hoja?.disponible && hoja.url && (
+            <a
+              className="bm-btn bm-btn-dark"
+              href={hoja.url}
+              target="_blank"
+              rel="noreferrer"
+              title={hoja.ruta}
+            >
+              Ver hoja de vida ↗
+            </a>
+          )}
+          {hoja && !(hoja.disponible && hoja.url) && (
+            <span className="bm-btn bm-btn-soft" aria-disabled="true">
+              Hoja de vida no disponible
+            </span>
+          )}
         </div>
       </div>
+
+      {hoja?.mensaje && (
+        <div
+          className={`bm-alert ${hoja.disponible ? 'bm-alert-info' : 'bm-alert-error'}`}
+          role="alert"
+          style={{ marginTop: 16 }}
+        >
+          {hoja.mensaje}
+        </div>
+      )}
 
       <div className="bm-cols" style={{ marginTop: 16 }}>
         <div className="bm-card" style={{ marginTop: 0 }}>
@@ -165,7 +212,8 @@ export default function Candidato() {
             valor={candidato.anios_experiencia ? `${candidato.anios_experiencia} años` : null}
           />
           <Campo etiqueta="Ubicación" valor={candidato.ubicacion} />
-          <Campo etiqueta="Hoja de vida" valor={candidato.ruta_hoja_vida} />
+          <Campo etiqueta="Documento" valor={hoja?.nombre_archivo || candidato.nombre_archivo} />
+          <Campo etiqueta="Ubicación en el repositorio" valor={hoja?.ruta ?? candidato.nombre_archivo} />
         </div>
       </div>
     </>
