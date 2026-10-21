@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
+  ejecutarBusqueda,
   esperaCancelada,
   esperarResultado,
   etapaPorDefecto,
@@ -29,6 +30,7 @@ export default function Resultados() {
   const [progreso, setProgreso] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
 
   // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
   // análisis anterior en vez de dejarlo corriendo en segundo plano.
@@ -45,6 +47,7 @@ export default function Resultados() {
     setProgreso(0)
     try {
       const inicial = await obtenerResultados(busquedaId)
+      setSolicitudIdReintento(inicial.solicitud_id)
 
       const final =
         inicial.estado === 'COMPLETADA'
@@ -74,6 +77,25 @@ export default function Resultados() {
     void cargar()
     return () => control.current?.abort()
   }, [cargar])
+
+  const reintentar = async () => {
+    if (!solicitudIdReintento) {
+      await cargar()
+      return
+    }
+
+    setCargando(true)
+    setError('')
+
+    try {
+      const nuevaBusqueda = await ejecutarBusqueda(solicitudIdReintento)
+      navegar(`/resultados/${nuevaBusqueda.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCargando(false)
+    }
+  }
 
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {
     const actualizada = await marcarPreseleccion(recomendacionId, valor)
@@ -106,8 +128,12 @@ export default function Resultados() {
     return (
       <>
         <div className="bm-alert bm-alert-error">{error}</div>
-        <button className="bm-btn bm-btn-ghost" onClick={() => void cargar()}>
-          Reintentar
+        <button
+          className="bm-btn bm-btn-ghost"
+          onClick={() => void reintentar()}
+          disabled={cargando}
+        >
+          {cargando ? 'Reintentando...' : 'Reintentar'}
         </button>
       </>
     )

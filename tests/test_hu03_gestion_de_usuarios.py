@@ -187,6 +187,7 @@ def test_hu03_la_superusuaria_revoca_el_rol_de_administrador(
     respuesta = cliente.patch(
         f"/auth/usuarios/{admin.id}", json={"rol": "COORDINADOR"}, headers=entrar(diana.correo)
     )
+    print("STATUS:", respuesta.status_code, "RESPUESTA:", respuesta.json())
 
     assert respuesta.json()["rol"] == "COORDINADOR"
 

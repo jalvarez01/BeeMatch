@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # SUPERADMINISTRADOR no se asigna desde la API: solo la siembra lo crea.
 Rol = Literal["COORDINADOR", "DIRECTOR", "ADMINISTRADOR"]
@@ -37,6 +37,14 @@ class UsuarioCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     rol: Rol = "COORDINADOR"
     id_entra: Optional[str] = None
+    
+    @field_validator("correo")
+    @classmethod
+    def validar_dominio_bee(cls, valor: EmailStr) -> EmailStr:
+        dominio = str(valor).rsplit("@", 1)[-1].lower()
+        if dominio != "bee.com.co":
+            raise ValueError("Solo se permiten correos con dominio @bee.com.co.")
+        return valor
 
 
 class RegistroRequest(BaseModel):

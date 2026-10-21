@@ -5,6 +5,7 @@ from backend.config import DOMINIO_CORREO
 from backend.domain.services.bitacora_service import ACCION_LOGIN, ACCION_LOGOUT, BitacoraService
 from backend.domain.services.bloqueo_login_service import BloqueoLoginService
 from backend.infrastructure.persistence.database import get_db
+from backend.infrastructure.persistence.models.usuario import UsuarioModel
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from backend.schemas.auth import (
     CambiarPasswordRequest,
@@ -205,18 +206,55 @@ def actualizar_usuario(
     """HU-03/HU-04: edición, aprobación de registros, cambio de rol e inactivación."""
     repo = UsuarioRepository(db)
     usuario = repo.get_by_id(usuario_id)
+
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
+    # Evitar que un usuario desactive su propia cuenta.
     if usuario.id == current_user.id and datos.activo is False:
-        raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta.")
+        raise HTTPException(
+            status_code=400,
+            detail="No puedes desactivar tu propia cuenta.",
+        )
+
+    # Proteger al último administrador activo.
+    es_admin_activo = usuario.activo and usuario.rol == ROL_ADMINISTRADOR
+    pierde_rol_admin = (
+        datos.rol is not None and datos.rol != ROL_ADMINISTRADOR
+    )
+    se_desactiva = datos.activo is False
+
+    if (
+        current_user.rol != "SUPERADMINISTRADOR"
+        and es_admin_activo
+        and (pierde_rol_admin or se_desactiva)
+    ):
+        otros_admins_activos = (
+            db.query(UsuarioModel)
+            .filter(
+                UsuarioModel.rol == ROL_ADMINISTRADOR,
+                UsuarioModel.activo.is_(True),
+                UsuarioModel.id != usuario_id,
+            )
+            .count()
+        )
+
+        if otros_admins_activos == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede quitar o desactivar al último administrador activo.",
+            )
 
     _exigir_poder_sobre(current_user, usuario.rol)
 
     cambios: dict = {}
+
     if datos.rol is not None:
         if datos.rol not in ROLES_QUE_GESTIONA[current_user.rol]:
-            raise HTTPException(status_code=403, detail="No puedes asignar ese rol.")
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes asignar ese rol.",
+            )
         cambios["rol"] = datos.rol
 
     if datos.nombre is not None:
@@ -224,7 +262,10 @@ def actualizar_usuario(
 
     if datos.correo is not None and datos.correo.lower() != usuario.correo:
         if repo.get_by_correo(datos.correo):
-            raise HTTPException(status_code=409, detail="Ya existe un usuario con ese correo.")
+            raise HTTPException(
+                status_code=409,
+                detail="Ya existe un usuario con ese correo.",
+            )
         cambios["correo"] = datos.correo
 
     if datos.activo is not None:

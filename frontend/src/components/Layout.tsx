@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { cerrarSesion } from '../api/auth'
 import { EVENTO_SESION_EXPIRADA, leerSesion } from '../api/client'
 import { MINUTOS_INACTIVIDAD, useInactividad } from '../hooks/useInactividad'
+import type { Rol, Sesion } from '../types'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -19,16 +20,44 @@ const TITULOS: Record<string, string> = {
   '/usuarios': 'Usuarios',
 }
 
+const RUTAS_POR_ROL: Record<Rol, string[]> = {
+  COORDINADOR: ['/nueva-busqueda', '/candidatos'],
+  DIRECTOR: ['/nueva-busqueda', '/candidatos', '/historial'],
+  ADMINISTRADOR: [
+    '/inicio',
+    '/nueva-busqueda',
+    '/solicitudes',
+    '/usuarios',
+    '/candidatos',
+    '/historial',
+    '/resultados',
+    '/candidato',
+    '/configuracion',
+  ],
+  SUPERADMINISTRADOR: [
+    '/inicio',
+    '/nueva-busqueda',
+    '/solicitudes',
+    '/usuarios',
+    '/candidatos',
+    '/historial',
+    '/resultados',
+    '/candidato',
+    '/configuracion',
+  ],
+}
+
 function tituloDe(ruta: string): string {
   const coincidencia = Object.keys(TITULOS).find((t) => ruta.startsWith(t))
   return coincidencia ? TITULOS[coincidencia] : 'BeeMatch'
 }
 
-/** Envoltura de las pantallas autenticadas. Bloquea el acceso sin sesión. */
+/** Envoltura de las pantallas autenticadas y control de acceso por rol. */
 export default function Layout() {
   const ubicacion = useLocation()
+
   const navegar = useNavigate()
-  const sesion = leerSesion<{ access_token?: string }>()
+  const sesion = leerSesion<Sesion>()
 
   const irAlLogin = useCallback(
     (motivo: string) => navegar('/login', { replace: true, state: { motivo } }),
@@ -48,10 +77,9 @@ export default function Layout() {
     const alExpirar = () => irAlLogin('Tu sesión expiró. Inicia sesión nuevamente.')
     window.addEventListener(EVENTO_SESION_EXPIRADA, alExpirar)
 
-    // HU-02-CP3: con el botón atrás el navegador puede restaurar la pantalla
-    // desde su caché sin volver a ejecutar nada; se vuelve a comprobar la sesión.
+    // HU-02-CP3: comprobar la sesión al volver desde la caché del navegador.
     const alVolver = (evento: PageTransitionEvent) => {
-      if (evento.persisted && !leerSesion<{ access_token?: string }>()?.access_token) {
+      if (evento.persisted && !leerSesion<Sesion>()?.access_token) {
         window.location.replace('/login')
       }
     }
@@ -63,8 +91,23 @@ export default function Layout() {
     }
   }, [irAlLogin])
 
-  if (!sesion?.access_token) {
+  const rol = sesion?.usuario?.rol
+  const rutaPermitida = rol
+    ? RUTAS_POR_ROL[rol].some(
+        (ruta) =>
+          ubicacion.pathname === ruta ||
+          ubicacion.pathname.startsWith(`${ruta}/`),
+      )
+    : false
+
+  if (!sesion?.access_token || !rol) {
     return <Navigate to="/login" replace state={{ desde: ubicacion.pathname }} />
+  }
+
+  if (!rutaPermitida) {
+    const rutaInicial =
+      rol === 'ADMINISTRADOR' ? '/inicio' : '/nueva-busqueda'
+    return <Navigate to={rutaInicial} replace />
   }
 
   return (

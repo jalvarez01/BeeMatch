@@ -23,6 +23,7 @@ export default function App() {
         <Route path="/inicio" element={<Dashboard />} />
         <Route path="/nueva-busqueda" element={<NuevaBusqueda />} />
         <Route path="/solicitudes" element={<Solicitudes />} />
+        <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/candidatos" element={<Candidatos />} />
         <Route path="/historial" element={<Historial />} />
         <Route path="/resultados/:busquedaId" element={<Resultados />} />
