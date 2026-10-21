@@ -81,7 +81,11 @@ def api(monkeypatch):
 
 
 def solicitud(api) -> str:
-    registro = SolicitudModel(descripcion_libre=DESCRIPCION, usuario_id=api.usuario.id)
+    # HU-10: sin rol y descripción la búsqueda no se ejecuta, así que la
+    # solicitud de estas pruebas los lleva completos.
+    registro = SolicitudModel(
+        descripcion_libre=DESCRIPCION, rol_buscado="Desarrollador", usuario_id=api.usuario.id
+    )
     api.db.add(registro)
     api.db.commit()
     return registro.id
