@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.persistence.models.solicitud import (
     ESTADO_BORRADOR,
     ESTADO_PROCESADA,
+    ESTADO_SIN_COINCIDENCIAS,
 )
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.cliente_repo import (
@@ -176,7 +177,9 @@ class SolicitudService:
         usuario = self.usuarios.get_by_id(solicitud.usuario_id)
         respuesta.usuario_nombre = usuario.nombre if usuario else None
 
-        if solicitud.estado == ESTADO_PROCESADA:
+        # HU-23: una solicitud sin coincidencias también tiene búsqueda, para
+        # poder abrir sus resultados desde el historial.
+        if solicitud.estado in (ESTADO_PROCESADA, ESTADO_SIN_COINCIDENCIAS):
             busqueda = self.busquedas.ultima_de_solicitud(solicitud.id)
             if busqueda:
                 recomendaciones = self.busquedas.listar_recomendaciones(busqueda.id)

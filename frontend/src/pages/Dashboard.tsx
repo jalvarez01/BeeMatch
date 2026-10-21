@@ -10,6 +10,7 @@ const CLASE_RECIENTE: Record<EstadoSolicitud, string> = {
   PROCESADA: 'ok',
   EN_ANALISIS: 'wip',
   BORRADOR: 'wip',
+  SIN_COINCIDENCIAS: 'err',
   ERROR: 'err',
 }
 
@@ -17,7 +18,8 @@ const ETIQUETA_RECIENTE: Record<EstadoSolicitud, string> = {
   PROCESADA: 'Procesada',
   EN_ANALISIS: 'En análisis',
   BORRADOR: 'Borrador',
-  ERROR: 'Sin coincidencias',
+  SIN_COINCIDENCIAS: 'Sin coincidencias',
+  ERROR: 'Error',
 }
 
 export default function Dashboard() {

@@ -12,6 +12,7 @@ const FILTROS: { valor: EstadoSolicitud | ''; etiqueta: string }[] = [
   { valor: 'PROCESADA', etiqueta: 'Procesada' },
   { valor: 'EN_ANALISIS', etiqueta: 'En análisis' },
   { valor: 'BORRADOR', etiqueta: 'Borrador' },
+  { valor: 'SIN_COINCIDENCIAS', etiqueta: 'Sin coincidencias' },
 ]
 
 const POR_PAGINA = 10
@@ -161,6 +162,24 @@ export default function Historial() {
                 >
                   Ver solicitud →
                 </button>
+              )}
+
+              {solicitud.estado === 'SIN_COINCIDENCIAS' && (
+                // HU-23: desde el historial se puede ajustar la búsqueda y volver a intentarlo.
+                <>
+                  <button
+                    className="bm-btn bm-btn-ghost"
+                    onClick={() => navegar(`/nueva-busqueda?solicitud=${solicitud.id}`)}
+                  >
+                    Ajustar criterios
+                  </button>
+                  <button
+                    className="bm-btn bm-btn-dark"
+                    onClick={() => navegar(`/resultados/${solicitud.busqueda_id}`)}
+                  >
+                    Ver resultados →
+                  </button>
+                </>
               )}
 
               {solicitud.estado === 'BORRADOR' && (

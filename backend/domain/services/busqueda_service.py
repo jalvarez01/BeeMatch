@@ -28,7 +28,11 @@ from backend.infrastructure.persistence.models.hoja_vida import (
     ESTADO_INDEXADA,
     ESTADO_NO_PROCESABLE,
 )
-from backend.infrastructure.persistence.models.solicitud import ESTADO_ERROR, ESTADO_PROCESADA
+from backend.infrastructure.persistence.models.solicitud import (
+    ESTADO_ERROR,
+    ESTADO_PROCESADA,
+    ESTADO_SIN_COINCIDENCIAS,
+)
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
@@ -116,7 +120,11 @@ class BusquedaService:
                 tokens_entrada=respuesta_ia.tokens_entrada,
                 tokens_salida=respuesta_ia.tokens_salida,
             )
-            self.solicitudes.cambiar_estado(solicitud.id, ESTADO_PROCESADA)
+            # HU-23: hubo finalistas, pero si ninguno superó el umbral la
+            # solicitud queda en el historial como "Sin coincidencias".
+            self.solicitudes.cambiar_estado(
+                solicitud.id, ESTADO_PROCESADA if recomendaciones else ESTADO_SIN_COINCIDENCIAS
+            )
 
         except ProveedorEmbeddingsNoDisponibleError as exc:
             # Mismo trato que un fallo del LLM: es una pieza del sistema que
@@ -192,4 +200,4 @@ class BusquedaService:
             cv_analizados=self.hojas.contar_por_estado(ESTADO_INDEXADA),
             cv_no_procesables=self.hojas.contar_por_estado(ESTADO_NO_PROCESABLE),
         )
-        self.solicitudes.cambiar_estado(solicitud_id, ESTADO_PROCESADA)
+        self.solicitudes.cambiar_estado(solicitud_id, ESTADO_SIN_COINCIDENCIAS)
