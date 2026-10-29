@@ -1,15 +1,34 @@
-from fastapi import APIRouter, Depends, Query
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import (
     ACCION_CONFIG_CAMBIADA,
     BitacoraService,
+    RangoDeFechasInvalidoError,
 )
 from backend.domain.services.onedrive_config_service import OneDriveConfigService
+from backend.domain.services.parametros_service import (
+    MAXIMO_CANDIDATOS,
+    MAXIMO_UMBRAL,
+    MINIMO_CANDIDATOS,
+    MINIMO_UMBRAL,
+    ParametrosInvalidosError,
+    ParametrosRecomendacionService,
+    validar_clave,
+)
 from backend.domain.services.repositorio_config_service import RepositorioConfigService
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.repositories.configuracion_repo import ParametroRepository
-from backend.schemas.configuracion import BitacoraResponse, ParametroResponse, ParametroUpdate
+from backend.schemas.configuracion import (
+    BitacoraPagina,
+    ParametroResponse,
+    ParametroUpdate,
+    RecomendacionParametros,
+    RecomendacionParametrosUpdate,
+)
 from backend.schemas.onedrive import (
     ConexionOneDriveRequest,
     ConexionOneDriveResponse,
@@ -212,6 +231,57 @@ def guardar_repositorio(
 # =============================================================================
 
 
+@router.get("/recomendacion", response_model=RecomendacionParametros)
+def obtener_recomendacion(db: Session = Depends(get_db), _=Depends(exigir_rol(ROL_ADMINISTRADOR))):
+    """HU-07: valores vigentes de los parámetros de recomendación y sus límites."""
+    return _parametros_respuesta(ParametrosRecomendacionService(db))
+
+
+@router.put("/recomendacion", response_model=RecomendacionParametros)
+def actualizar_recomendacion(
+    datos: RecomendacionParametrosUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(exigir_rol(ROL_ADMINISTRADOR)),
+):
+    """
+    HU-07: guarda los dos valores o ninguno. Si alguno está fuera de rango
+    responde 422 con el motivo y los valores anteriores quedan como estaban.
+    Aplica a las búsquedas que se lancen después, no a resultados ya generados.
+    """
+    servicio = ParametrosRecomendacionService(db)
+    antes = servicio.obtener()
+    try:
+        servicio.actualizar(datos.num_candidatos, datos.umbral_afinidad, current_user.id)
+    except ParametrosInvalidosError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    BitacoraService(db).registrar(
+        ACCION_CONFIG_CAMBIADA,
+        usuario_id=current_user.id,
+        entidad="parametros_recomendacion",
+        detalle=(
+            f"candidatos {antes.num_candidatos} a {datos.num_candidatos}; "
+            f"afinidad minima {antes.umbral_afinidad} a {datos.umbral_afinidad}"
+        ),
+    )
+    return _parametros_respuesta(servicio)
+
+
+def _parametros_respuesta(servicio: ParametrosRecomendacionService) -> RecomendacionParametros:
+    vigentes = servicio.obtener()
+    defecto = servicio.por_defecto()
+    return RecomendacionParametros(
+        num_candidatos=vigentes.num_candidatos,
+        umbral_afinidad=vigentes.umbral_afinidad,
+        num_candidatos_por_defecto=defecto.num_candidatos,
+        umbral_afinidad_por_defecto=defecto.umbral_afinidad,
+        minimo_candidatos=MINIMO_CANDIDATOS,
+        maximo_candidatos=MAXIMO_CANDIDATOS,
+        minimo_umbral=MINIMO_UMBRAL,
+        maximo_umbral=MAXIMO_UMBRAL,
+    )
+
+
 @router.get("/parametros", response_model=list[ParametroResponse])
 def listar_parametros(db: Session = Depends(get_db), _=Depends(exigir_rol(ROL_ADMINISTRADOR))):
     return ParametroRepository(db).listar()
@@ -224,6 +294,12 @@ def actualizar_parametro(
     db: Session = Depends(get_db),
     current_user=Depends(exigir_rol(ROL_ADMINISTRADOR)),
 ):
+    # Estas dos claves tienen los mismos límites que /recomendacion.
+    try:
+        validar_clave(clave, datos.valor)
+    except ParametrosInvalidosError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     parametro = ParametroRepository(db).establecer(clave, datos.valor, current_user.id)
     BitacoraService(db).registrar(
         ACCION_CONFIG_CAMBIADA, usuario_id=current_user.id, entidad="parametro", entidad_id=clave
@@ -231,11 +307,21 @@ def actualizar_parametro(
     return parametro
 
 
-@router.get("/bitacora", response_model=list[BitacoraResponse])
+@router.get("/bitacora", response_model=BitacoraPagina)
 def bitacora(
-    limite: int = Query(default=100, ge=1, le=500),
+    limite: int = Query(default=50, ge=1, le=500),
     desplazamiento: int = Query(default=0, ge=0),
+    usuario_id: Optional[str] = Query(default=None),
+    fecha_desde: Optional[date] = Query(default=None),
+    fecha_hasta: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
     _=Depends(exigir_rol(ROL_ADMINISTRADOR)),
 ):
-    return BitacoraService(db).listar(limite, desplazamiento)
+    """HU-06: más recientes primero, con filtro por usuario y por rango de fechas."""
+    try:
+        total, items = BitacoraService(db).listar(
+            limite, desplazamiento, usuario_id, fecha_desde, fecha_hasta
+        )
+    except RangoDeFechasInvalidoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return BitacoraPagina(total=total, limite=limite, desplazamiento=desplazamiento, items=items)

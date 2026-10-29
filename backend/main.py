@@ -93,15 +93,19 @@ def _hay_origen_configurado() -> bool:
 
 
 def _sembrar_parametros():
-    """Valores por defecto del motor de recomendación (HU-07)."""
-    from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS, UMBRAL_AFINIDAD_MINIMA
+    """
+    Valores por defecto del motor de recomendación.
+
+    El número de candidatos y el umbral de afinidad (HU-07) no se siembran: sin
+    fila guardada rigen los de config.py, y solo se escriben cuando el
+    administrador los cambia.
+    """
+    from backend.config import FINALISTAS_RERANK
     from backend.infrastructure.persistence.database import SessionLocal
     from backend.infrastructure.persistence.repositories.configuracion_repo import ParametroRepository
 
     defaults = {
-        "top_n_resultados": str(TOP_N_RESULTADOS),
         "finalistas_rerank": str(FINALISTAS_RERANK),
-        "umbral_afinidad_minima": str(UMBRAL_AFINIDAD_MINIMA),
     }
 
     db = SessionLocal()

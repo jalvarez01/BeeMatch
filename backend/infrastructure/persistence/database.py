@@ -27,7 +27,10 @@ def init_db():
 
 # Columnas añadidas después de crear las tablas. `create_all` no altera tablas
 # existentes, y una base ya poblada (HU-03: `usuarios.pendiente`) las perdería.
-_COLUMNAS_NUEVAS = {"usuarios": {"pendiente": "BOOLEAN NOT NULL DEFAULT FALSE"}}
+_COLUMNAS_NUEVAS = {
+    "usuarios": {"pendiente": "BOOLEAN NOT NULL DEFAULT FALSE"},
+    "bitacora": {"rol": "VARCHAR(20)"},
+}
 
 
 def _agregar_columnas_faltantes():
