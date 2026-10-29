@@ -263,6 +263,20 @@ def test_hu06_criterio3_un_doble_clic_no_registra_la_misma_busqueda_dos_veces(
     assert len(_busquedas_registradas(db)) == 1
 
 
+def test_hu06_criterio3_el_segundo_clic_devuelve_la_busqueda_en_curso_y_deja_un_solo_evento(
+    cliente, crear_usuario, entrar, sin_worker, db
+):
+    _, cabeceras, solicitud = _preparar_busqueda(cliente, crear_usuario, entrar)
+
+    primera = cliente.post(f"/busquedas/solicitud/{solicitud}", headers=cabeceras)
+    segunda = cliente.post(f"/busquedas/solicitud/{solicitud}", headers=cabeceras)
+
+    assert primera.status_code == segunda.status_code == 202
+    assert segunda.json()["id"] == primera.json()["id"]
+    eventos = _busquedas_registradas(db)
+    assert [e.entidad_id for e in eventos] == [primera.json()["id"]]
+
+
 def test_hu06_criterio3_una_busqueda_rechazada_por_validacion_no_se_registra(
     cliente, crear_usuario, entrar, sin_worker, db
 ):
