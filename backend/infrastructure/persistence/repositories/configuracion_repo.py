@@ -13,6 +13,13 @@ from backend.infrastructure.persistence.models.configuracion import (
 from backend.infrastructure.persistence.models.usuario import UsuarioModel
 
 
+def _en_utc(momento: Optional[datetime]) -> Optional[datetime]:
+    """SQLite devuelve las fechas sin zona; se guardan en UTC, así que se marca como tal."""
+    if momento is not None and momento.tzinfo is None:
+        return momento.replace(tzinfo=UTC)
+    return momento
+
+
 class RepositorioConfigRepository:
     """
     Acceso a la configuración del origen de hojas de vida (HU-05).
@@ -202,7 +209,7 @@ class BitacoraRepository:
         items = [
             {
                 "id": registro.id,
-                "created_at": registro.created_at,
+                "created_at": _en_utc(registro.created_at),
                 "usuario_id": registro.usuario_id,
                 "usuario_nombre": usuario.nombre if usuario else None,
                 "usuario_correo": usuario.correo if usuario else None,

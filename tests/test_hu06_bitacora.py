@@ -63,6 +63,8 @@ def test_hu06_criterio1_cada_evento_trae_fecha_hora_usuario_rol_y_accion(cliente
     login = next(e for e in cuerpo["items"] if e["accion"] == ACCION_LOGIN)
     momento = datetime.fromisoformat(login["created_at"])
     assert momento.date() == datetime.now(UTC).date()
+    # La fecha viaja con zona (UTC) para que el navegador la muestre en hora local.
+    assert momento.utcoffset() == timedelta(0)
     assert momento.time() is not None
     assert login["usuario_nombre"] == "Admin Bee"
     assert login["usuario_correo"] == "admin@bee.com.co"
