@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ejecutarBusqueda } from '../api/busquedas'
-import { duplicarSolicitud, listarHistorial } from '../api/solicitudes'
+import { duplicarSolicitud, eliminarSolicitud, listarHistorial } from '../api/solicitudes'
 import { EstadoBadge } from '../components/Badges'
 import { IconSearch } from '../components/Icons'
 import type { EstadoSolicitud, Solicitud } from '../types'
@@ -52,6 +52,17 @@ export default function Historial() {
   const duplicar = async (solicitudId: string) => {
     const copia = await duplicarSolicitud(solicitudId)
     navegar(`/nueva-busqueda?solicitud=${copia.id}`)
+  }
+
+  const eliminarBorrador = async (solicitudId: string) => {
+    if (!window.confirm('¿Eliminar este borrador? Esta acción no se puede deshacer.')) return
+    setError('')
+    try {
+      await eliminarSolicitud(solicitudId)
+      await cargar()
+    } catch (e) {
+      setError((e as Error).message)
+    }
   }
 
   const reejecutar = async (solicitudId: string) => {
@@ -151,11 +162,12 @@ export default function Historial() {
             <EstadoBadge estado={solicitud.estado} />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+              <button className="bm-btn bm-btn-ghost" onClick={() => void duplicar(solicitud.id)}>
+                Duplicar
+              </button>
+
               {solicitud.estado === 'PROCESADA' && (
                 <>
-                  <button className="bm-btn bm-btn-ghost" onClick={() => void duplicar(solicitud.id)}>
-                    Duplicar
-                  </button>
                   <button
                     className="bm-btn bm-btn-dark"
                     onClick={() => navegar(`/resultados/${solicitud.busqueda_id}`)}
@@ -193,12 +205,20 @@ export default function Historial() {
               )}
 
               {solicitud.estado === 'BORRADOR' && (
-                <button
-                  className="bm-btn bm-btn-ghost"
-                  onClick={() => navegar(`/nueva-busqueda?solicitud=${solicitud.id}`)}
-                >
-                  Continuar editando →
-                </button>
+                <>
+                  <button
+                    className="bm-btn bm-btn-ghost bm-btn-soft bm-btn-draft-hover"
+                    onClick={() => navegar(`/nueva-busqueda?solicitud=${solicitud.id}`)}
+                  >
+                    Continuar editando →
+                  </button>
+                  <button
+                    className="bm-btn bm-btn-ghost bm-btn-compact bm-btn-delete-hover"
+                    onClick={() => void eliminarBorrador(solicitud.id)}
+                  >
+                    Eliminar
+                  </button>
+                </>
               )}
 
               {solicitud.estado === 'ERROR' && (
