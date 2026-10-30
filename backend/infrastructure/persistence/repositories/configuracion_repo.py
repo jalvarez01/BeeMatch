@@ -1,5 +1,7 @@
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models._base import utcnow
@@ -8,6 +10,14 @@ from backend.infrastructure.persistence.models.configuracion import (
     ParametroRecomendacionModel,
     RegistroBitacoraModel,
 )
+from backend.infrastructure.persistence.models.usuario import UsuarioModel
+
+
+def _en_utc(momento: Optional[datetime]) -> Optional[datetime]:
+    """SQLite devuelve las fechas sin zona; se guardan en UTC, así que se marca como tal."""
+    if momento is not None and momento.tzinfo is None:
+        return momento.replace(tzinfo=UTC)
+    return momento
 
 
 class RepositorioConfigRepository:
@@ -130,6 +140,24 @@ class ParametroRepository:
         return parametro
 
 
+    def establecer_varios(
+        self, valores: dict[str, str], usuario_id: Optional[str] = None
+    ) -> list[ParametroRecomendacionModel]:
+        """Escribe varios parámetros en una sola transacción."""
+        parametros = []
+        for clave, valor in valores.items():
+            parametro = self.get(clave)
+            if parametro:
+                parametro.valor = valor
+                parametro.actualizado_por = usuario_id
+            else:
+                parametro = ParametroRecomendacionModel(clave=clave, valor=valor, actualizado_por=usuario_id)
+                self.db.add(parametro)
+            parametros.append(parametro)
+        self.db.commit()
+        return parametros
+
+
 class BitacoraRepository:
     def __init__(self, db: Session):
         self.db = db
@@ -141,11 +169,56 @@ class BitacoraRepository:
         self.db.refresh(registro)
         return registro
 
-    def listar(self, limite: int = 100, desplazamiento: int = 0) -> list[RegistroBitacoraModel]:
-        return (
-            self.db.query(RegistroBitacoraModel)
-            .order_by(RegistroBitacoraModel.created_at.desc())
+    def consultar(
+        self,
+        limite: int = 100,
+        desplazamiento: int = 0,
+        usuario_id: Optional[str] = None,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
+    ) -> tuple[int, list[dict]]:
+        """
+        Eventos con el usuario asociado, más recientes primero.
+
+        El rol sale del registro; los eventos anteriores a que se guardara ahí
+        usan el rol actual del usuario. `fecha_hasta` incluye todo ese día.
+        """
+        filtros = []
+        if usuario_id:
+            filtros.append(RegistroBitacoraModel.usuario_id == usuario_id)
+        if fecha_desde:
+            filtros.append(
+                RegistroBitacoraModel.created_at >= datetime.combine(fecha_desde, time.min, tzinfo=UTC)
+            )
+        if fecha_hasta:
+            filtros.append(
+                RegistroBitacoraModel.created_at
+                < datetime.combine(fecha_hasta + timedelta(days=1), time.min, tzinfo=UTC)
+            )
+
+        total = self.db.query(func.count(RegistroBitacoraModel.id)).filter(*filtros).scalar() or 0
+        filas = (
+            self.db.query(RegistroBitacoraModel, UsuarioModel)
+            .outerjoin(UsuarioModel, UsuarioModel.id == RegistroBitacoraModel.usuario_id)
+            .filter(*filtros)
+            .order_by(RegistroBitacoraModel.created_at.desc(), RegistroBitacoraModel.id)
             .offset(desplazamiento)
             .limit(limite)
             .all()
         )
+        items = [
+            {
+                "id": registro.id,
+                "created_at": _en_utc(registro.created_at),
+                "usuario_id": registro.usuario_id,
+                "usuario_nombre": usuario.nombre if usuario else None,
+                "usuario_correo": usuario.correo if usuario else None,
+                "rol": registro.rol or (usuario.rol if usuario else None),
+                "accion": registro.accion,
+                "entidad": registro.entidad,
+                "entidad_id": registro.entidad_id,
+                "detalle": registro.detalle,
+            }
+            for registro, usuario in filas
+        ]
+        return total, items

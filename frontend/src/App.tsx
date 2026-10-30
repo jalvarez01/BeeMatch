@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Layout from './components/Layout'
+import Bitacora from './pages/Bitacora'
 import Candidato from './pages/Candidato'
 import Candidatos from './pages/Candidatos'
 import Configuracion from './pages/Configuracion'
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/nueva-busqueda" element={<NuevaBusqueda />} />
         <Route path="/solicitudes" element={<Solicitudes />} />
         <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/bitacora" element={<Bitacora />} />
         <Route path="/candidatos" element={<Candidatos />} />
         <Route path="/historial" element={<Historial />} />
         <Route path="/resultados/:busquedaId" element={<Resultados />} />

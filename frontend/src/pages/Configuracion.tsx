@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 
 import { apiFetch } from '../api/client'
 import {
+  guardarParametros,
+  obtenerParametros,
+  type ParametrosRecomendacion,
+} from '../api/recomendacion'
+import {
   guardarConexion,
   obtenerConexion,
   probarConexion,
@@ -36,12 +41,6 @@ interface Sincronizacion {
   /** Registrados pero todavía sin indexar, por ejemplo si falta el proveedor de embeddings. */
   documentos_aplazados: number
   mensaje: string
-}
-
-interface Parametro {
-  clave: string
-  valor: string
-  descripcion: string | null
 }
 
 /** Campos propios de OneDrive: los cuatro de la aplicación registrada y la ruta. */
@@ -125,6 +124,152 @@ function analizarCredencialesJson(texto: string): AnalisisJson {
   }
 }
 
+/** HU-07: número de candidatos sugeridos y porcentaje mínimo de afinidad. */
+function ParametrosRecomendacionSeccion() {
+  const [vigentes, setVigentes] = useState<ParametrosRecomendacion | null>(null)
+  const [candidatos, setCandidatos] = useState('')
+  const [afinidad, setAfinidad] = useState('')
+  const [errorCandidatos, setErrorCandidatos] = useState('')
+  const [errorAfinidad, setErrorAfinidad] = useState('')
+  const [errorGeneral, setErrorGeneral] = useState('')
+  const [aviso, setAviso] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  const mostrar = (parametros: ParametrosRecomendacion) => {
+    setVigentes(parametros)
+    setCandidatos(String(parametros.num_candidatos))
+    setAfinidad(String(parametros.umbral_afinidad))
+  }
+
+  useEffect(() => {
+    obtenerParametros()
+      .then(mostrar)
+      .catch((e: Error) => setErrorGeneral(e.message))
+  }, [])
+
+  if (!vigentes) {
+    return (
+      <div className="bm-card">
+        <h2 className="bm-h2">Parámetros de recomendación</h2>
+        {errorGeneral && <div className="bm-alert bm-alert-error">{errorGeneral}</div>}
+      </div>
+    )
+  }
+
+  const mensajeCandidatos = `El número de candidatos debe ser un entero entre ${vigentes.minimo_candidatos} y ${vigentes.maximo_candidatos}.`
+  const mensajeAfinidad = `El porcentaje mínimo debe ser un entero entre ${vigentes.minimo_umbral} y ${vigentes.maximo_umbral}.`
+
+  const entero = (texto: string, minimo: number, maximo: number): number | null => {
+    if (!/^\d+$/.test(texto.trim())) return null
+    const numero = Number(texto)
+    return numero >= minimo && numero <= maximo ? numero : null
+  }
+
+  const guardar = async (evento: React.FormEvent) => {
+    evento.preventDefault()
+    setAviso('')
+    setErrorGeneral('')
+
+    const nuevosCandidatos = entero(candidatos, vigentes.minimo_candidatos, vigentes.maximo_candidatos)
+    const nuevaAfinidad = entero(afinidad, vigentes.minimo_umbral, vigentes.maximo_umbral)
+    setErrorCandidatos(nuevosCandidatos === null ? mensajeCandidatos : '')
+    setErrorAfinidad(nuevaAfinidad === null ? mensajeAfinidad : '')
+
+    if (nuevosCandidatos === null || nuevaAfinidad === null) {
+      // Se conserva lo guardado: el campo vuelve al valor anterior.
+      setCandidatos(String(vigentes.num_candidatos))
+      setAfinidad(String(vigentes.umbral_afinidad))
+      return
+    }
+
+    setGuardando(true)
+    try {
+      mostrar(await guardarParametros({ num_candidatos: nuevosCandidatos, umbral_afinidad: nuevaAfinidad }))
+      setAviso('Parámetros guardados. Aplican a las búsquedas que se lancen desde ahora.')
+    } catch (e) {
+      setErrorGeneral((e as Error).message)
+      setCandidatos(String(vigentes.num_candidatos))
+      setAfinidad(String(vigentes.umbral_afinidad))
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <form className="bm-card" onSubmit={guardar} noValidate aria-label="Parámetros de recomendación">
+      <h2 className="bm-h2">Parámetros de recomendación</h2>
+      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px' }}>
+        Cambian el comportamiento del motor sin necesidad de desplegar. Aplican a las búsquedas
+        que se lancen después; los resultados ya generados no cambian.
+      </p>
+
+      {errorGeneral && <div className="bm-alert bm-alert-error" role="alert">{errorGeneral}</div>}
+      {aviso && <div className="bm-alert bm-alert-ok" role="status">{aviso}</div>}
+
+      <div className="bm-grid2">
+        <div>
+          <div className="bm-field" data-error={errorCandidatos ? 'true' : undefined}>
+            <label htmlFor="param-candidatos">Candidatos sugeridos</label>
+            <input
+              id="param-candidatos"
+              type="number"
+              inputMode="numeric"
+              min={vigentes.minimo_candidatos}
+              max={vigentes.maximo_candidatos}
+              value={candidatos}
+              aria-invalid={errorCandidatos ? true : undefined}
+              onChange={(e) => {
+                setCandidatos(e.target.value)
+                setErrorCandidatos('')
+              }}
+            />
+          </div>
+          {errorCandidatos ? (
+            <p className="bm-error" role="alert">{errorCandidatos}</p>
+          ) : (
+            <p className="bm-hint">
+              De {vigentes.minimo_candidatos} a {vigentes.maximo_candidatos}. Por defecto: {vigentes.num_candidatos_por_defecto}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <div className="bm-field" data-error={errorAfinidad ? 'true' : undefined}>
+            <label htmlFor="param-afinidad">Afinidad mínima (%)</label>
+            <input
+              id="param-afinidad"
+              type="number"
+              inputMode="numeric"
+              min={vigentes.minimo_umbral}
+              max={vigentes.maximo_umbral}
+              value={afinidad}
+              aria-invalid={errorAfinidad ? true : undefined}
+              onChange={(e) => {
+                setAfinidad(e.target.value)
+                setErrorAfinidad('')
+              }}
+            />
+          </div>
+          {errorAfinidad ? (
+            <p className="bm-error" role="alert">{errorAfinidad}</p>
+          ) : (
+            <p className="bm-hint">
+              De {vigentes.minimo_umbral} a {vigentes.maximo_umbral}. Por defecto: {vigentes.umbral_afinidad_por_defecto}.
+              Quien no llegue a este porcentaje no se sugiere.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <button type="submit" className="bm-btn bm-btn-primary" disabled={guardando}>
+          {guardando ? 'Guardando…' : 'Guardar parámetros'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 /** HU-05 (conexión al repositorio), HU-06 (bitácora) y HU-07 (parámetros). */
 export default function Configuracion() {
   const [tipo, setTipo] = useState<TipoRepositorio>('ONEDRIVE')
@@ -144,7 +289,6 @@ export default function Configuracion() {
 
   const [indice, setIndice] = useState<EstadoIndice | null>(null)
   const [noProcesables, setNoProcesables] = useState<HojaNoProcesable[]>([])
-  const [parametros, setParametros] = useState<Parametro[]>([])
   const [sincronizando, setSincronizando] = useState(false)
 
   const cargar = () => {
@@ -175,7 +319,6 @@ export default function Configuracion() {
       .catch((e: Error) => setError(e.message))
 
     cargarIndice()
-    apiFetch<Parametro[]>('/configuracion/parametros').then(setParametros).catch(() => undefined)
   }
 
   // HU-17: conteo del análisis y detalle de los documentos que no se pudieron leer.
@@ -330,14 +473,6 @@ export default function Configuracion() {
     } finally {
       setSincronizando(false)
     }
-  }
-
-  const guardarParametro = async (clave: string, valor: string) => {
-    await apiFetch(`/configuracion/parametros/${clave}`, {
-      method: 'PUT',
-      body: JSON.stringify({ valor }),
-    })
-    setMensaje('Parámetro actualizado.')
   }
 
   return (
@@ -607,23 +742,7 @@ export default function Configuracion() {
       </div>
 
       {/* ---------- HU-07 ---------- */}
-      <div className="bm-card">
-        <h2 className="bm-h2">Parámetros de recomendación</h2>
-        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px' }}>
-          Cambian el comportamiento del motor sin necesidad de desplegar.
-        </p>
-
-        {parametros.map((parametro) => (
-          <div className="bm-field" key={parametro.clave} style={{ marginBottom: 10 }}>
-            <label htmlFor={parametro.clave}>{parametro.clave}</label>
-            <input
-              id={parametro.clave}
-              defaultValue={parametro.valor}
-              onBlur={(e) => void guardarParametro(parametro.clave, e.target.value)}
-            />
-          </div>
-        ))}
-      </div>
+      <ParametrosRecomendacionSeccion />
     </>
   )
 }

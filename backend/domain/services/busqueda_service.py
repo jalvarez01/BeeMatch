@@ -11,15 +11,17 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS
+from backend.config import FINALISTAS_RERANK
 from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
 from backend.domain.matching.scorer import supera_umbral
 from backend.domain.services.bitacora_service import (
+    ACCION_BUSQUEDA_EJECUTADA,
     ACCION_ERROR_SERVICIO,
     BitacoraService,
 )
+from backend.domain.services.parametros_service import ParametrosRecomendacionService
 from backend.infrastructure.llm.embeddings import (
     ProveedorEmbeddings,
     ProveedorEmbeddingsNoDisponibleError,
@@ -67,9 +69,21 @@ class BusquedaService:
         self.reranker = Reranker()
         self.embeddings = ProveedorEmbeddings()
 
-    def encolar(self, solicitud_id: str) -> str:
-        """Crea la búsqueda y devuelve su id para que el frontend haga polling."""
+    def encolar(self, solicitud_id: str, usuario_id: Optional[str] = None) -> str:
+        """
+        Crea la búsqueda y devuelve su id para que el frontend haga polling.
+
+        Aquí queda el evento de bitácora de HU-06: la búsqueda se crea una sola
+        vez, mientras que el worker (o el respaldo dentro de la API) puede
+        ejecutarla por caminos distintos.
+        """
         busqueda = self.busquedas.crear(solicitud_id)
+        BitacoraService(self.db).registrar(
+            accion=ACCION_BUSQUEDA_EJECUTADA,
+            usuario_id=usuario_id,
+            entidad="busqueda",
+            entidad_id=busqueda.id,
+        )
         return busqueda.id
 
     def en_curso(self, solicitud_id: str) -> Optional[BusquedaModel]:
@@ -118,6 +132,10 @@ class BusquedaService:
             self.busquedas.actualizar_progreso(busqueda_id, "Analizando los perfiles finalistas", 80)
             resultados, respuesta_ia = self.reranker.ordenar_y_explicar(consulta, requisitos, finalistas)
 
+            # HU-07: los parámetros se leen al ejecutar, no al arrancar, para que un
+            # cambio del administrador aplique a las búsquedas que se lancen después.
+            parametros = ParametrosRecomendacionService(self.db).obtener()
+
             recomendaciones = [
                 {
                     "candidato_id": r["candidato_id"],
@@ -127,8 +145,8 @@ class BusquedaService:
                     "coincidencias": r["coincidencias"],
                 }
                 for r in resultados
-                if supera_umbral(r["puntaje_afinidad"])
-            ][:TOP_N_RESULTADOS]
+                if supera_umbral(r["puntaje_afinidad"], parametros.umbral_afinidad)
+            ][: parametros.num_candidatos]
 
             self.busquedas.guardar_recomendaciones(busqueda_id, recomendaciones)
             self.busquedas.actualizar_progreso(busqueda_id, "Listo", 100)

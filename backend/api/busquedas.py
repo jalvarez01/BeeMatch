@@ -1,11 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.domain.services.bitacora_service import (
-    ACCION_BUSQUEDA_EJECUTADA,
-    ACCION_PRESELECCION,
-    BitacoraService,
-)
+from backend.domain.services.bitacora_service import ACCION_PRESELECCION, BitacoraService
 from backend.domain.services.busqueda_service import BusquedaService
 from backend.domain.services.resultado_service import ResultadoService
 from backend.domain.services.solicitud_service import (
@@ -86,18 +82,11 @@ def ejecutar(
     if en_curso:
         return BusquedaEstadoResponse.model_validate(en_curso)
 
-    busqueda_id = servicio.encolar(solicitud_id)
+    busqueda_id = servicio.encolar(solicitud_id, usuario_id=current_user.id)
     solicitudes.cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
     # La sincronización con el repositorio (HU-16) la hace el worker, no esta
     # petición: ver backend/workers/busqueda_worker.py.
     despachar(tareas, ejecutar_busqueda, busqueda_id)
-
-    BitacoraService(db).registrar(
-        ACCION_BUSQUEDA_EJECUTADA,
-        usuario_id=current_user.id,
-        entidad="busqueda",
-        entidad_id=busqueda_id,
-    )
 
     busqueda = servicio.busquedas.get_by_id(busqueda_id)
     return BusquedaEstadoResponse.model_validate(busqueda)
