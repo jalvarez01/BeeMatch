@@ -2,6 +2,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from backend.infrastructure.persistence.models.busqueda import BusquedaModel
 from backend.infrastructure.persistence.models.solicitud import CriterioModel, SolicitudModel
 
 
@@ -35,6 +36,26 @@ class SolicitudRepository:
         self.db.commit()
         self.db.refresh(solicitud)
         return solicitud
+
+    def eliminar_borrador(self, solicitud: SolicitudModel) -> None:
+        """Elimina una solicitud en borrador y sus criterios sin tocar el historial."""
+        tiene_busquedas = (
+            self.db.query(BusquedaModel.id)
+            .filter(BusquedaModel.solicitud_id == solicitud.id)
+            .first()
+        )
+        if tiene_busquedas:
+            raise ValueError("La solicitud tiene búsquedas asociadas y no se puede eliminar.")
+
+        try:
+            self.db.query(CriterioModel).filter(
+                CriterioModel.solicitud_id == solicitud.id
+            ).delete(synchronize_session=False)
+            self.db.delete(solicitud)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
 
     def listar(
         self,
