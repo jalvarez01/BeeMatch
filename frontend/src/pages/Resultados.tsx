@@ -18,6 +18,8 @@ import { IconSpark } from '../components/Icons'
 import type { BusquedaResultado, Solicitud } from '../types'
 
 const MENSAJE_SIN_CANDIDATOS = 'No se encontraron candidatos afines al perfil solicitado'
+// HU-25: el mismo texto que responde el backend (export_service.MENSAJE_SIN_PRESELECCION).
+const MENSAJE_SIN_PRESELECCION = 'Debes seleccionar al menos un candidato para exportar.'
 
 /** HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
 export default function Resultados() {
@@ -32,6 +34,8 @@ export default function Resultados() {
   const [error, setError] = useState('')
   const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
   const [avisoPreseleccion, setAvisoPreseleccion] = useState('')
+  const [avisoExportacion, setAvisoExportacion] = useState('')
+  const [exportando, setExportando] = useState<'PDF' | 'XLSX' | null>(null)
 
   // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
   // análisis anterior en vez de dejarlo corriendo en segundo plano.
@@ -114,6 +118,7 @@ export default function Resultados() {
       )
 
     setAvisoPreseleccion('')
+    setAvisoExportacion('')
     fijar(valor)
     try {
       const actualizada = await marcarPreseleccion(recomendacionId, valor)
@@ -124,11 +129,20 @@ export default function Resultados() {
     }
   }
 
-  const exportar = async () => {
+  // HU-25: los errores de la exportación se avisan sin cambiar la pantalla de resultados.
+  const exportar = async (formato: 'PDF' | 'XLSX') => {
+    setAvisoExportacion('')
+    if (!resultado?.recomendaciones.some((r) => r.preseleccionado)) {
+      setAvisoExportacion(MENSAJE_SIN_PRESELECCION)
+      return
+    }
+    setExportando(formato)
     try {
-      await exportarPreseleccion(busquedaId, 'XLSX')
+      await exportarPreseleccion(busquedaId, formato)
     } catch (e) {
-      setError((e as Error).message)
+      setAvisoExportacion((e as Error).message)
+    } finally {
+      setExportando(null)
     }
   }
 
@@ -215,14 +229,30 @@ export default function Resultados() {
                 ? '1 candidato preseleccionado'
                 : `${preseleccionados} candidatos preseleccionados`}
             </span>
-            <button className="bm-btn bm-btn-dark" onClick={exportar}>
-              Exportar preselección
+            <button
+              className="bm-btn bm-btn-dark"
+              onClick={() => void exportar('PDF')}
+              disabled={exportando !== null}
+            >
+              {exportando === 'PDF' ? 'Generando…' : 'Exportar PDF'}
+            </button>
+            <button
+              className="bm-btn bm-btn-ghost"
+              onClick={() => void exportar('XLSX')}
+              disabled={exportando !== null}
+            >
+              {exportando === 'XLSX' ? 'Generando…' : 'Exportar Excel'}
             </button>
           </div>
         </div>
       )}
 
       {avisoPreseleccion && <div className="bm-alert bm-alert-error">{avisoPreseleccion}</div>}
+      {avisoExportacion && (
+        <div className="bm-alert bm-alert-error" role="alert">
+          {avisoExportacion}
+        </div>
+      )}
 
       {resultado.recomendaciones.length === 0 && (
         // HU-23: el mensaje es explícito y sugiere flexibilizar la búsqueda.

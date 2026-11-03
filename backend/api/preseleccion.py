@@ -30,9 +30,7 @@ def exportar(
     try:
         archivo = ExportService(db).exportar(busqueda_id, datos.formato)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     BitacoraService(db).registrar(
         ACCION_EXPORTACION,
