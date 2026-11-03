@@ -143,6 +143,12 @@ export default function Historial() {
               {solicitud.mejor_afinidad != null && (
                 <div style={{ color: 'var(--muted)' }}>{solicitud.mejor_afinidad}% mejor afinidad</div>
               )}
+              {/* HU-24: al volver a la solicitud se ve cuántos se marcaron para el cliente. */}
+              {!!solicitud.total_preseleccionados && (
+                <div style={{ color: 'var(--green-tx)', fontWeight: 600 }}>
+                  ✓ {textoPreseleccionados(solicitud.total_preseleccionados)}
+                </div>
+              )}
               {solicitud.estado === 'EN_ANALISIS' && (
                 <div style={{ color: 'var(--muted)' }}>Analizando perfiles…</div>
               )}
@@ -231,6 +237,10 @@ export default function Historial() {
       </div>
     </>
   )
+}
+
+function textoPreseleccionados(total: number): string {
+  return total === 1 ? '1 preseleccionado' : `${total} preseleccionados`
 }
 
 function formatearFecha(iso: string | null): string {

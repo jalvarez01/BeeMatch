@@ -31,6 +31,7 @@ export default function Resultados() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
+  const [avisoPreseleccion, setAvisoPreseleccion] = useState('')
 
   // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
   // análisis anterior en vez de dejarlo corriendo en segundo plano.
@@ -97,18 +98,30 @@ export default function Resultados() {
     }
   }
 
+  // HU-24: la casilla cambia al instante. Si el servidor no guarda el cambio,
+  // vuelve a su estado anterior y se avisa sin perder la pantalla de resultados.
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {
-    const actualizada = await marcarPreseleccion(recomendacionId, valor)
-    setResultado((previo) =>
-      previo
-        ? {
-            ...previo,
-            recomendaciones: previo.recomendaciones.map((r) =>
-              r.id === recomendacionId ? { ...r, preseleccionado: actualizada.preseleccionado } : r,
-            ),
-          }
-        : previo,
-    )
+    const fijar = (preseleccionado: boolean) =>
+      setResultado((previo) =>
+        previo
+          ? {
+              ...previo,
+              recomendaciones: previo.recomendaciones.map((r) =>
+                r.id === recomendacionId ? { ...r, preseleccionado } : r,
+              ),
+            }
+          : previo,
+      )
+
+    setAvisoPreseleccion('')
+    fijar(valor)
+    try {
+      const actualizada = await marcarPreseleccion(recomendacionId, valor)
+      fijar(actualizada.preseleccionado)
+    } catch (e) {
+      fijar(!valor)
+      setAvisoPreseleccion(`No se pudo guardar la preselección. ${(e as Error).message}`)
+    }
   }
 
   const exportar = async () => {
@@ -142,6 +155,7 @@ export default function Resultados() {
   if (!resultado) return null
 
   const criterios = solicitud?.criterios.map((c) => c.valor) ?? []
+  const preseleccionados = resultado.recomendaciones.filter((r) => r.preseleccionado).length
 
   return (
     <>
@@ -195,11 +209,20 @@ export default function Resultados() {
             </p>
             <LeyendaAfinidad />
           </div>
-          <button className="bm-btn bm-btn-dark" onClick={exportar}>
-            Exportar preselección
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {preseleccionados === 1
+                ? '1 candidato preseleccionado'
+                : `${preseleccionados} candidatos preseleccionados`}
+            </span>
+            <button className="bm-btn bm-btn-dark" onClick={exportar}>
+              Exportar preselección
+            </button>
+          </div>
         </div>
       )}
+
+      {avisoPreseleccion && <div className="bm-alert bm-alert-error">{avisoPreseleccion}</div>}
 
       {resultado.recomendaciones.length === 0 && (
         // HU-23: el mensaje es explícito y sugiere flexibilizar la búsqueda.

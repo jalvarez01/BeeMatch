@@ -188,5 +188,6 @@ class SolicitudService:
                 respuesta.mejor_afinidad = (
                     max(r.puntaje_afinidad for r in recomendaciones) if recomendaciones else None
                 )
+                respuesta.total_preseleccionados = sum(1 for r in recomendaciones if r.preseleccionado)
 
         return respuesta
