@@ -224,13 +224,14 @@ export default function Resultados() {
             <LeyendaAfinidad />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
               {preseleccionados === 1
                 ? '1 candidato preseleccionado'
                 : `${preseleccionados} candidatos preseleccionados`}
             </span>
             <button
               className="bm-btn bm-btn-dark"
+              style={{ whiteSpace: 'nowrap' }}
               onClick={() => void exportar('PDF')}
               disabled={exportando !== null}
             >
@@ -238,6 +239,7 @@ export default function Resultados() {
             </button>
             <button
               className="bm-btn bm-btn-ghost"
+              style={{ whiteSpace: 'nowrap' }}
               onClick={() => void exportar('XLSX')}
               disabled={exportando !== null}
             >

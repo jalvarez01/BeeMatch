@@ -16,10 +16,12 @@ import pytest
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
-from backend.domain.services import export_service
+from backend.config import STORAGE_DIR
 from backend.domain.services.bitacora_service import ACCION_EXPORTACION, BitacoraService
 from backend.domain.services.export_service import MENSAJE_SIN_PRESELECCION
+from backend.infrastructure.persistence.models.busqueda import RecomendacionModel
 from backend.infrastructure.persistence.models.cliente import ClienteModel
+from backend.infrastructure.persistence.models.hoja_vida import CandidatoModel
 from backend.infrastructure.persistence.models.solicitud import SolicitudModel
 from tests.test_hu24_preseleccion import _marcar
 from tests.test_hu24_preseleccion import busqueda as busqueda  # noqa: F401  (fixture)
@@ -27,12 +29,6 @@ from tests.test_hu24_preseleccion import cabeceras as cabeceras  # noqa: F401  (
 
 ROL = "Desarrolladora Backend"
 CLIENTE = "Bancolombia"
-
-
-@pytest.fixture(autouse=True)
-def _archivos_en_temporal(tmp_path, monkeypatch):
-    """Los archivos de prueba no se quedan en storage/."""
-    monkeypatch.setattr(export_service, "STORAGE_DIR", tmp_path)
 
 
 @pytest.fixture
@@ -130,6 +126,45 @@ def test_sin_cliente_el_archivo_lo_indica(cliente, cabeceras, busqueda):
     texto = _texto_excel(_exportar(cliente, cabeceras, busqueda["busqueda_id"], "XLSX").content)
 
     assert "Sin cliente asignado" in texto
+
+
+def test_un_texto_que_empieza_por_igual_queda_como_texto_en_el_excel(db, cliente, cabeceras, busqueda):
+    """Lo que viene de una hoja de vida no se convierte en fórmula en el archivo del cliente."""
+    nombre = '=HYPERLINK("http://ejemplo.invalido","clic")'
+    primero = busqueda["recomendaciones"][0]
+    candidato = db.get(CandidatoModel, db.get(RecomendacionModel, primero).candidato_id)
+    candidato.nombre = nombre
+    db.commit()
+    _marcar(cliente, cabeceras, primero, True)
+
+    contenido = _exportar(cliente, cabeceras, busqueda["busqueda_id"], "XLSX").content
+
+    hoja = load_workbook(io.BytesIO(contenido)).active
+    celda = next(c for fila in hoja.iter_rows() for c in fila if c.value == nombre)
+    assert celda.data_type == "s"
+
+
+def test_el_pdf_muestra_nombres_fuera_de_latin1(db, cliente, cabeceras, busqueda):
+    nombre = "Łukasz Żółć Ödön"
+    primero = busqueda["recomendaciones"][0]
+    candidato = db.get(CandidatoModel, db.get(RecomendacionModel, primero).candidato_id)
+    candidato.nombre = nombre
+    db.commit()
+    _marcar(cliente, cabeceras, primero, True)
+
+    texto = _texto_pdf(_exportar(cliente, cabeceras, busqueda["busqueda_id"], "PDF").content)
+
+    assert nombre in texto
+
+
+@pytest.mark.parametrize("formato", ["XLSX", "PDF"])
+def test_el_archivo_no_queda_guardado_en_el_servidor(cliente, cabeceras, busqueda, formato):
+    _marcar_dos(cliente, cabeceras, busqueda)
+    antes = set(STORAGE_DIR.glob("preseleccion_*"))
+
+    assert _exportar(cliente, cabeceras, busqueda["busqueda_id"], formato).status_code == 200
+
+    assert set(STORAGE_DIR.glob("preseleccion_*")) == antes
 
 
 # --- Criterio 3: sin preseleccionados -----------------------------------------

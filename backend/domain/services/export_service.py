@@ -1,11 +1,12 @@
 """Exportación de la preselección en PDF o XLSX (HU-25)."""
 
+import io
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from backend.config import STORAGE_DIR
 from backend.domain.matching.scorer import NIVEL_ALTA, NIVEL_BAJA, NIVEL_MEDIA
 from backend.domain.services.resultado_service import ResultadoService
 from backend.domain.services.solicitud_service import SolicitudService
@@ -17,6 +18,22 @@ COLUMNAS = ["#", "Candidato", "Rol", "Años", "Afinidad", "Nivel", "Tecnologías
 # Ancho en milímetros de cada columna del PDF (A4 horizontal: 277 mm útiles).
 ANCHOS_PDF = (8, 40, 36, 12, 18, 14, 85, 64)
 
+# Las fuentes base del PDF solo cubren Latin-1; DejaVu muestra cualquier nombre (Łukasz, Ödön…).
+FUENTES = Path(__file__).resolve().parents[2] / "assets" / "fonts"
+FUENTE_PDF = "DejaVu"
+
+TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+TIPO_PDF = "application/pdf"
+
+
+@dataclass
+class ArchivoExportado:
+    """El archivo se arma en memoria: no queda en el servidor con datos de candidatos."""
+
+    contenido: bytes
+    nombre: str
+    tipo: str
+
 
 class ExportService:
     def __init__(self, db: Session):
@@ -24,7 +41,7 @@ class ExportService:
         self.resultados = ResultadoService(db)
         self.solicitudes = SolicitudService(db)
 
-    def exportar(self, busqueda_id: str, formato: str = "PDF") -> Path:
+    def exportar(self, busqueda_id: str, formato: str = "PDF") -> ArchivoExportado:
         resultado = self.resultados.resultados(busqueda_id)
         if not resultado:
             raise ValueError("La búsqueda no existe.")
@@ -37,8 +54,10 @@ class ExportService:
         filas = [self._fila(r) for r in preseleccionados]
 
         if formato.upper() == "XLSX":
-            return self._exportar_xlsx(busqueda_id, encabezado, filas)
-        return self._exportar_pdf(busqueda_id, encabezado, filas)
+            contenido = self._exportar_xlsx(encabezado, filas)
+            return ArchivoExportado(contenido, f"preseleccion_{busqueda_id}.xlsx", TIPO_XLSX)
+        contenido = self._exportar_pdf(encabezado, filas)
+        return ArchivoExportado(contenido, f"preseleccion_{busqueda_id}.pdf", TIPO_PDF)
 
     def _encabezado(self, solicitud_id: str) -> list[tuple[str, str]]:
         """Perfil solicitado, cliente y fecha: lo que el cliente necesita para ubicar el listado."""
@@ -70,7 +89,7 @@ class ExportService:
             r.ruta_hoja_vida or "",
         ]
 
-    def _exportar_xlsx(self, busqueda_id: str, encabezado, filas) -> Path:
+    def _exportar_xlsx(self, encabezado, filas) -> bytes:
         from openpyxl import Workbook
         from openpyxl.styles import Font
 
@@ -94,39 +113,41 @@ class ExportService:
         for letra, ancho in zip("ABCDEFGH", (18, 30, 28, 8, 10, 10, 50, 50), strict=True):
             hoja.column_dimensions[letra].width = ancho
 
-        destino = STORAGE_DIR / f"preseleccion_{busqueda_id}.xlsx"
-        libro.save(destino)
-        return destino
+        # Los textos vienen de las hojas de vida y openpyxl guarda como fórmula lo que
+        # empieza por "=": en el archivo para el cliente todo queda como texto.
+        for fila_celdas in hoja.iter_rows():
+            for celda in fila_celdas:
+                if celda.data_type == "f":
+                    celda.data_type = "s"
 
-    def _exportar_pdf(self, busqueda_id: str, encabezado, filas) -> Path:
+        salida = io.BytesIO()
+        libro.save(salida)
+        return salida.getvalue()
+
+    def _exportar_pdf(self, encabezado, filas) -> bytes:
         from fpdf import FPDF
 
         pdf = FPDF(orientation="L", format="A4")
+        pdf.add_font(FUENTE_PDF, "", str(FUENTES / "DejaVuSans.ttf"))
+        pdf.add_font(FUENTE_PDF, "B", str(FUENTES / "DejaVuSans-Bold.ttf"))
         pdf.set_auto_page_break(auto=True, margin=12)
         pdf.add_page()
 
-        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_font(FUENTE_PDF, "B", 16)
         pdf.cell(0, 10, "Preselección de candidatos", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
 
         for etiqueta, valor in encabezado:
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font(FUENTE_PDF, "B", 10)
             pdf.cell(38, 6, f"{etiqueta}:")
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, _latin1(valor), new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font(FUENTE_PDF, "", 10)
+            pdf.multi_cell(0, 6, valor, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font(FUENTE_PDF, "", 8)
         with pdf.table(col_widths=ANCHOS_PDF, text_align="LEFT", line_height=5) as tabla:
             tabla.row(COLUMNAS)
             for fila in filas:
-                tabla.row([_latin1(str(valor)) for valor in fila])
+                tabla.row([str(valor) for valor in fila])
 
-        destino = STORAGE_DIR / f"preseleccion_{busqueda_id}.pdf"
-        pdf.output(str(destino))
-        return destino
-
-
-def _latin1(texto: str) -> str:
-    """Las fuentes base del PDF solo cubren Latin-1: lo que no entre se cambia por '?'."""
-    return texto.encode("latin-1", "replace").decode("latin-1")
+        return bytes(pdf.output())
