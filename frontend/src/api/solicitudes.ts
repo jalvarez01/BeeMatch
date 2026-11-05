@@ -26,6 +26,10 @@ export async function duplicarSolicitud(id: string): Promise<Solicitud> {
   return apiFetch<Solicitud>(`/solicitudes/${id}/duplicar`, { method: 'POST' })
 }
 
+export async function eliminarSolicitud(id: string): Promise<void> {
+  await apiFetch<void>(`/solicitudes/${id}`, { method: 'DELETE' })
+}
+
 export async function listarHistorial(params: {
   estado?: string
   texto?: string

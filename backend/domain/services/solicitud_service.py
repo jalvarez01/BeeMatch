@@ -132,6 +132,15 @@ class SolicitudService:
         self.repo.reemplazar_criterios(copia.id, criterios)
         return self._enriquecer(copia)
 
+    def eliminar_borrador(self, solicitud_id: str) -> bool:
+        solicitud = self.repo.get_by_id(solicitud_id)
+        if not solicitud:
+            return False
+        if solicitud.estado != ESTADO_BORRADOR:
+            raise ValueError("Solo se pueden eliminar solicitudes en estado Borrador.")
+        self.repo.eliminar_borrador(solicitud)
+        return True
+
     def obtener(self, solicitud_id: str) -> Optional[SolicitudResponse]:
         solicitud = self.repo.get_by_id(solicitud_id)
         return self._enriquecer(solicitud) if solicitud else None

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_SOLICITUD_CREADA, BitacoraService
@@ -129,3 +129,24 @@ def duplicar_solicitud(
         raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
 
     return copia
+
+
+@router.delete("/{solicitud_id}", status_code=204)
+def eliminar_solicitud(
+    solicitud_id: str,
+    svc: SolicitudService = Depends(_service),
+    current_user=Depends(get_current_user),
+):
+    solicitud = svc.repo.get_by_id(solicitud_id)
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    _verificar_acceso_solicitud(solicitud, current_user)
+    try:
+        eliminada = svc.eliminar_borrador(solicitud_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if not eliminada:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+    return Response(status_code=204)
