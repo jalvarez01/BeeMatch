@@ -58,6 +58,7 @@ export interface Solicitud {
   criterios: Criterio[]
   total_candidatos: number | null
   mejor_afinidad: number | null
+  total_preseleccionados: number | null
   busqueda_id: string | null
 }
 

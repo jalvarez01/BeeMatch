@@ -58,6 +58,8 @@ class SolicitudResponse(BaseModel):
     criterios: list[CriterioResponse] = []
     total_candidatos: Optional[int] = None
     mejor_afinidad: Optional[float] = None
+    # HU-24: cuántos candidatos de la última búsqueda se marcaron para el cliente.
+    total_preseleccionados: Optional[int] = None
     busqueda_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
