@@ -25,7 +25,7 @@ def _ejecutar_con_fallo(monkeypatch, error):
 
     class Busquedas:
         def get_by_id(self, _):
-            return SimpleNamespace(id="b1", solicitud_id="s1")
+            return SimpleNamespace(id="b1", solicitud_id="s1", parametros_json=None)
 
         def finalizar(self, busqueda_id, **kwargs):
             eventos.setdefault("finalizar", []).append(kwargs)
@@ -41,6 +41,8 @@ def _ejecutar_con_fallo(monkeypatch, error):
                 descripcion_libre="d",
                 rol_buscado="r",
                 experiencia_min=None,
+                cliente_id=None,
+                proyecto_id=None,
             )
 
         def listar_criterios(self, _):

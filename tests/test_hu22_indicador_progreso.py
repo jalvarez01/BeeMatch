@@ -40,6 +40,7 @@ from backend.infrastructure.persistence.models.busqueda import (
 from backend.infrastructure.persistence.models.solicitud import SolicitudModel
 from backend.infrastructure.persistence.models.usuario import UsuarioModel
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
+from backend.infrastructure.persistence.repositories.cliente_repo import ClienteRepository
 from backend.main import app
 from backend.security import get_current_user
 from backend.workers import busqueda_worker, queue
@@ -83,10 +84,14 @@ def api(monkeypatch):
 
 
 def solicitud(api) -> str:
-    # HU-10: sin rol y descripción la búsqueda no se ejecuta, así que la
-    # solicitud de estas pruebas los lleva completos.
+    # HU-10 y HU-12: sin rol, descripción y cliente la búsqueda no se ejecuta, así
+    # que la solicitud de estas pruebas los lleva completos.
+    cliente = ClienteRepository(api.db).get_o_crear("Bancolombia")
     registro = SolicitudModel(
-        descripcion_libre=DESCRIPCION, rol_buscado="Desarrollador", usuario_id=api.usuario.id
+        descripcion_libre=DESCRIPCION,
+        rol_buscado="Desarrollador",
+        cliente_id=cliente.id,
+        usuario_id=api.usuario.id,
     )
     api.db.add(registro)
     api.db.commit()

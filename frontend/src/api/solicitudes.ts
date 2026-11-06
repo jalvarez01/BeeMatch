@@ -33,11 +33,13 @@ export async function eliminarSolicitud(id: string): Promise<void> {
 export async function listarHistorial(params: {
   estado?: string
   texto?: string
+  clienteId?: string
   pagina?: number
 }): Promise<Historial> {
   const query = new URLSearchParams()
   if (params.estado) query.set('estado', params.estado)
   if (params.texto) query.set('texto', params.texto)
+  if (params.clienteId) query.set('cliente_id', params.clienteId)
   query.set('pagina', String(params.pagina ?? 1))
   return apiFetch<Historial>(`/solicitudes/?${query.toString()}`)
 }

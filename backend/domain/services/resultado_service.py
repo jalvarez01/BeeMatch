@@ -5,12 +5,14 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.domain.services.hoja_vida_service import HojaDeVidaService, ruta_hoja_vida
+from backend.domain.services.parametros_busqueda import leer_parametros
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.schemas.busqueda import (
     BusquedaResultadoResponse,
     CoincidenciaResponse,
+    EjecucionResumen,
     RecomendacionResponse,
 )
 
@@ -31,7 +33,42 @@ class ResultadoService:
         respuesta.recomendaciones = [
             self._enriquecer(r) for r in self.busquedas.listar_recomendaciones(busqueda_id)
         ]
+
+        # HU-15: qué se analizó en esta ejecución y cuál es su lugar entre las de la solicitud.
+        respuesta.parametros = leer_parametros(busqueda)
+        ejecuciones = self.busquedas.listar_de_solicitud(busqueda.solicitud_id)
+        respuesta.total_ejecuciones = len(ejecuciones)
+        respuesta.numero_ejecucion = next(
+            (n for n, e in enumerate(ejecuciones, start=1) if e.id == busqueda.id), 1
+        )
         return respuesta
+
+    def ejecuciones(self, solicitud_id: str) -> list[EjecucionResumen]:
+        """
+        HU-15: todas las ejecuciones de la solicitud con sus criterios, de la más
+        reciente a la más antigua. Cada una conserva lo que analizó y sus resultados.
+        """
+        busquedas = self.busquedas.listar_de_solicitud(solicitud_id)
+        resumenes = []
+        for numero, busqueda in enumerate(busquedas, start=1):
+            recomendaciones = self.busquedas.listar_recomendaciones(busqueda.id)
+            resumenes.append(
+                EjecucionResumen(
+                    id=busqueda.id,
+                    numero=numero,
+                    estado=busqueda.estado,
+                    created_at=busqueda.created_at,
+                    es_mas_reciente=numero == len(busquedas),
+                    total_candidatos=len(recomendaciones),
+                    mejor_afinidad=(
+                        max(r.puntaje_afinidad for r in recomendaciones) if recomendaciones else None
+                    ),
+                    mensaje_error=busqueda.mensaje_error,
+                    parametros=leer_parametros(busqueda),
+                )
+            )
+        resumenes.reverse()
+        return resumenes
 
     def detalle_recomendacion(self, recomendacion_id: str) -> Optional[RecomendacionResponse]:
         recomendacion = self.busquedas.get_recomendacion(recomendacion_id)

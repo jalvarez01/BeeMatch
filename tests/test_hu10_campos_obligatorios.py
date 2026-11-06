@@ -26,6 +26,8 @@ from backend.schemas.solicitud import EXPERIENCIA_MAX_ANIOS, SolicitudCreate, So
 
 DESCRIPCION = "Desarrollador Backend Java con Spring Boot y experiencia en banca."
 ROL = "Desarrollador Backend"
+# HU-12: toda solicitud lleva cliente; estas pruebas son de los demás campos.
+CLIENTE = "Bancolombia"
 
 
 @pytest.fixture
@@ -43,6 +45,7 @@ def sin_worker(monkeypatch):
 
 
 def _crear_solicitud(cliente, cabeceras, **datos) -> str:
+    datos.setdefault("cliente", CLIENTE)
     respuesta = cliente.post("/solicitudes/", json=datos, headers=cabeceras)
     assert respuesta.status_code == 201, respuesta.text
     return respuesta.json()["id"]

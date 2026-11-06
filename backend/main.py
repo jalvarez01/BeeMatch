@@ -7,6 +7,7 @@ from backend.api import (
     auth,
     busquedas,
     candidatos,
+    clientes,
     configuracion,
     dashboard,
     hojas_vida,
@@ -37,6 +38,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(solicitudes.router, prefix="/solicitudes", tags=["Solicitudes"])
 app.include_router(busquedas.router, prefix="/busquedas", tags=["Búsquedas"])
 app.include_router(preseleccion.router, prefix="/preseleccion", tags=["Preselección"])
+app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
 app.include_router(candidatos.router, prefix="/candidatos", tags=["Candidatos"])
 app.include_router(hojas_vida.router, prefix="/hojas-vida", tags=["Hojas de vida"])
 app.include_router(configuracion.router, prefix="/configuracion", tags=["Configuración"])

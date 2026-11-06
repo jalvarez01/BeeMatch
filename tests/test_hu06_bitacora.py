@@ -206,7 +206,7 @@ def _preparar_busqueda(cliente, crear_usuario, entrar, correo="ana@bee.com.co"):
     cabeceras = entrar(correo)
     solicitud = cliente.post(
         "/solicitudes/",
-        json={"descripcion_libre": DESCRIPCION, "rol_buscado": ROL},
+        json={"descripcion_libre": DESCRIPCION, "rol_buscado": ROL, "cliente": "Bancolombia"},
         headers=cabeceras,
     ).json()["id"]
     return usuario, cabeceras, solicitud
@@ -283,7 +283,9 @@ def test_hu06_criterio3_una_busqueda_rechazada_por_validacion_no_se_registra(
     crear_usuario("ana@bee.com.co")
     cabeceras = entrar("ana@bee.com.co")
     solicitud = cliente.post(
-        "/solicitudes/", json={"descripcion_libre": DESCRIPCION}, headers=cabeceras
+        "/solicitudes/",
+        json={"descripcion_libre": DESCRIPCION, "cliente": "Bancolombia"},
+        headers=cabeceras,
     ).json()["id"]
 
     assert cliente.post(f"/busquedas/solicitud/{solicitud}", headers=cabeceras).status_code == 422

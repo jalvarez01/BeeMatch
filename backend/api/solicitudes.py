@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_SOLICITUD_CREADA, BitacoraService
-from backend.domain.services.solicitud_service import SolicitudService
+from backend.domain.services.solicitud_service import (
+    MENSAJE_CLIENTE_OBLIGATORIO,
+    SolicitudService,
+    cliente_en_blanco,
+)
 from backend.infrastructure.persistence.database import get_db
 from backend.schemas.solicitud import (
     HistorialResponse,
@@ -50,6 +54,9 @@ def crear_solicitud(
             status_code=422,
             detail="Describe el perfil o selecciona un rol para poder buscar.",
         )
+    if cliente_en_blanco(datos.cliente):
+        # HU-12: también el borrador necesita cliente, para saber de qué proyecto es.
+        raise HTTPException(status_code=422, detail=MENSAJE_CLIENTE_OBLIGATORIO)
 
     solicitud = svc.crear(datos, current_user.id)
     BitacoraService(db).registrar(
@@ -62,13 +69,14 @@ def crear_solicitud(
 def historial(
     estado: Optional[str] = None,
     texto: Optional[str] = None,
+    cliente_id: Optional[str] = None,
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=10, ge=1, le=50),
     svc: SolicitudService = Depends(_service),
     _=Depends(exigir_rol(ROL_DIRECTOR, ROL_ADMINISTRADOR)),
 ):
-    """HU-13: historial filtrable."""
-    solicitudes, total = svc.historial(estado, texto, pagina, por_pagina)
+    """HU-13: historial filtrable. HU-12: también por cliente (`cliente_id`)."""
+    solicitudes, total = svc.historial(estado, texto, pagina, por_pagina, cliente_id)
     return HistorialResponse(total=total, pagina=pagina, solicitudes=solicitudes)
 
 
@@ -101,6 +109,10 @@ def actualizar_solicitud(
         raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
 
     _verificar_acceso_solicitud(solicitud_model, current_user)
+
+    if datos.cliente is not None and cliente_en_blanco(datos.cliente):
+        # HU-12: no se puede dejar la solicitud sin cliente al editarla.
+        raise HTTPException(status_code=422, detail=MENSAJE_CLIENTE_OBLIGATORIO)
 
     solicitud = svc.actualizar(solicitud_id, datos)
 

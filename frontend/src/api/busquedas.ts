@@ -1,13 +1,35 @@
 import type {
+  AjustePayload,
   BusquedaEstado,
   BusquedaResultado,
   DisponibilidadHojaVida,
+  EjecucionResumen,
   Recomendacion,
 } from '../types'
 import { apiFetch } from './client'
 
 export async function ejecutarBusqueda(solicitudId: string): Promise<BusquedaEstado> {
   return apiFetch<BusquedaEstado>(`/busquedas/solicitud/${solicitudId}`, { method: 'POST' })
+}
+
+/**
+ * HU-15: guarda los criterios ajustados y vuelve a ejecutar el análisis. Es una
+ * sola operación en el servidor: si los criterios no son válidos o ya hay un
+ * análisis en curso, no se cambia nada.
+ */
+export async function reejecutarBusqueda(
+  solicitudId: string,
+  ajuste: AjustePayload,
+): Promise<BusquedaEstado> {
+  return apiFetch<BusquedaEstado>(`/busquedas/solicitud/${solicitudId}/reejecutar`, {
+    method: 'POST',
+    body: JSON.stringify(ajuste),
+  })
+}
+
+/** HU-15: ejecuciones de la solicitud, de la más reciente a la más antigua. */
+export async function listarEjecuciones(solicitudId: string): Promise<EjecucionResumen[]> {
+  return apiFetch<EjecucionResumen[]>(`/busquedas/solicitud/${solicitudId}/ejecuciones`)
 }
 
 export async function consultarEstado(busquedaId: string): Promise<BusquedaEstado> {

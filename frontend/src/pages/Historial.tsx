@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ejecutarBusqueda } from '../api/busquedas'
+import { listarClientes } from '../api/clientes'
 import { duplicarSolicitud, eliminarSolicitud, listarHistorial } from '../api/solicitudes'
 import { EstadoBadge } from '../components/Badges'
 import { IconSearch } from '../components/Icons'
-import type { EstadoSolicitud, Solicitud } from '../types'
+import { formatearFecha } from '../lib/formato'
+import type { ClienteSugerido, EstadoSolicitud, Solicitud } from '../types'
 
 const FILTROS: { valor: EstadoSolicitud | ''; etiqueta: string }[] = [
   { valor: '', etiqueta: 'Todos' },
@@ -17,7 +19,7 @@ const FILTROS: { valor: EstadoSolicitud | ''; etiqueta: string }[] = [
 
 const POR_PAGINA = 10
 
-/** HU-13, HU-14, HU-15. */
+/** HU-12, HU-13, HU-14, HU-15. */
 export default function Historial() {
   const navegar = useNavigate()
 
@@ -25,6 +27,9 @@ export default function Historial() {
   const [total, setTotal] = useState(0)
   const [filtro, setFiltro] = useState<EstadoSolicitud | ''>('')
   const [texto, setTexto] = useState('')
+  // HU-12: filtro por cliente. Vacío es "todos los clientes".
+  const [clienteId, setClienteId] = useState('')
+  const [clientes, setClientes] = useState<ClienteSugerido[]>([])
   const [pagina, setPagina] = useState(1)
   const [error, setError] = useState('')
   // HU-22: id de la solicitud que se está reintentando; bloquea otro clic mientras tanto.
@@ -36,6 +41,7 @@ export default function Historial() {
       const respuesta = await listarHistorial({
         estado: filtro || undefined,
         texto: texto || undefined,
+        clienteId: clienteId || undefined,
         pagina,
       })
       setSolicitudes(respuesta.solicitudes)
@@ -43,11 +49,18 @@ export default function Historial() {
     } catch (e) {
       setError((e as Error).message)
     }
-  }, [filtro, texto, pagina])
+  }, [filtro, texto, clienteId, pagina])
 
   useEffect(() => {
     void cargar()
   }, [cargar])
+
+  // Los clientes del filtro son los ya registrados; si no cargan, el historial se ve igual.
+  useEffect(() => {
+    listarClientes('', 100)
+      .then(setClientes)
+      .catch(() => setClientes([]))
+  }, [])
 
   const duplicar = async (solicitudId: string) => {
     const copia = await duplicarSolicitud(solicitudId)
@@ -105,7 +118,26 @@ export default function Historial() {
         </button>
       </div>
 
-      <div className="bm-filters">
+      <div className="bm-filters" style={{ alignItems: 'center' }}>
+        <label htmlFor="filtro-cliente" style={{ fontSize: 12, color: 'var(--muted)' }}>
+          Cliente
+        </label>
+        <select
+          id="filtro-cliente"
+          value={clienteId}
+          onChange={(e) => {
+            setClienteId(e.target.value)
+            setPagina(1)
+          }}
+          style={{ fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line)' }}
+        >
+          <option value="">Todos los clientes</option>
+          {clientes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
         {FILTROS.map((f) => (
           <button
             key={f.etiqueta}
@@ -142,7 +174,9 @@ export default function Historial() {
                 {solicitud.rol_buscado ?? 'Sin rol definido'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {solicitud.cliente_nombre} · {solicitud.proyecto_nombre}
+                {[solicitud.cliente_nombre ?? 'Sin cliente', solicitud.proyecto_nombre]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 6 }}>
                 {formatearFecha(solicitud.created_at)} · Creada por {solicitud.usuario_nombre}
@@ -162,6 +196,9 @@ export default function Historial() {
               )}
               {solicitud.estado === 'EN_ANALISIS' && (
                 <div style={{ color: 'var(--muted)' }}>Analizando perfiles…</div>
+              )}
+              {solicitud.total_ejecuciones > 1 && (
+                <div style={{ color: 'var(--muted)' }}>{solicitud.total_ejecuciones} ejecuciones</div>
               )}
             </div>
 
@@ -227,6 +264,16 @@ export default function Historial() {
                 </>
               )}
 
+              {solicitud.estado === 'ERROR' && solicitud.busqueda_id && solicitud.total_ejecuciones > 1 && (
+                // HU-15: si un ajuste falló, las ejecuciones anteriores siguen consultables.
+                <button
+                  className="bm-btn bm-btn-ghost"
+                  onClick={() => navegar(`/resultados/${solicitud.busqueda_id}`)}
+                >
+                  Ver ejecuciones →
+                </button>
+              )}
+
               {solicitud.estado === 'ERROR' && (
                 <button
                   className="bm-btn bm-btn-ghost"
@@ -261,13 +308,4 @@ export default function Historial() {
 
 function textoPreseleccionados(total: number): string {
   return total === 1 ? '1 preseleccionado' : `${total} preseleccionados`
-}
-
-function formatearFecha(iso: string | null): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
 }
