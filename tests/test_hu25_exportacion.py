@@ -19,10 +19,15 @@ from pypdf import PdfReader
 from backend.config import STORAGE_DIR
 from backend.domain.services.bitacora_service import ACCION_EXPORTACION, BitacoraService
 from backend.domain.services.export_service import MENSAJE_SIN_PRESELECCION
-from backend.infrastructure.persistence.models.busqueda import RecomendacionModel
+from backend.domain.services.parametros_busqueda import parametros_de_solicitud
+from backend.domain.services.solicitud_service import SolicitudService
+from backend.infrastructure.persistence.models.busqueda import BusquedaModel, RecomendacionModel
 from backend.infrastructure.persistence.models.cliente import ClienteModel
 from backend.infrastructure.persistence.models.hoja_vida import CandidatoModel
 from backend.infrastructure.persistence.models.solicitud import SolicitudModel
+from backend.infrastructure.persistence.repositories.cliente_repo import ClienteRepository, ProyectoRepository
+from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
+from backend.schemas.solicitud import AjusteSolicitud, CriterioBase
 from tests.test_hu24_preseleccion import _marcar
 from tests.test_hu24_preseleccion import busqueda as busqueda  # noqa: F401  (fixture)
 from tests.test_hu24_preseleccion import cabeceras as cabeceras  # noqa: F401  (fixture)
@@ -40,6 +45,17 @@ def con_cliente(db, busqueda):
     solicitud = db.get(SolicitudModel, busqueda["solicitud_id"])
     solicitud.rol_buscado = ROL
     solicitud.cliente_id = cliente.id
+    db.commit()
+    # HU-15: el archivo sale de lo que guardó la ejecución, no de la solicitud actual; la
+    # búsqueda de la fixture ya existía, así que se actualiza su copia como si la solicitud
+    # hubiera estado completa al ejecutarla.
+    ejecucion = db.get(BusquedaModel, busqueda["busqueda_id"])
+    ejecucion.parametros_json = parametros_de_solicitud(
+        solicitud,
+        SolicitudRepository(db).listar_criterios(solicitud.id),
+        ClienteRepository(db),
+        ProyectoRepository(db),
+    ).model_dump_json()
     db.commit()
     return busqueda
 
@@ -165,6 +181,30 @@ def test_el_archivo_no_queda_guardado_en_el_servidor(cliente, cabeceras, busqued
     assert _exportar(cliente, cabeceras, busqueda["busqueda_id"], formato).status_code == 200
 
     assert set(STORAGE_DIR.glob("preseleccion_*")) == antes
+
+
+def test_exportar_una_ejecucion_anterior_usa_los_criterios_con_los_que_corrio(
+    db, cliente, cabeceras, con_cliente
+):
+    """HU-15: ajustar la solicitud después no cambia el encabezado del archivo de una ejecución anterior."""
+    SolicitudService(db).reemplazar(
+        con_cliente["solicitud_id"],
+        AjusteSolicitud(
+            descripcion_libre="Frontend React para el portal del cliente",
+            rol_buscado="Desarrollador Frontend",
+            cliente="Cliente Nuevo",
+            proyecto="Portal",
+            criterios=[CriterioBase(tipo="TECNOLOGIA", valor="React")],
+        ),
+    )
+    _marcar_dos(cliente, cabeceras, con_cliente)
+
+    texto = _texto_excel(_exportar(cliente, cabeceras, con_cliente["busqueda_id"], "XLSX").content)
+
+    assert ROL in texto and CLIENTE in texto
+    assert "Cliente Nuevo" not in texto
+    assert "Desarrollador Frontend" not in texto
+    assert "React" not in texto
 
 
 # --- Criterio 3: sin preseleccionados -----------------------------------------
