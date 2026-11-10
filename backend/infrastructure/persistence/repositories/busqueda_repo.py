@@ -20,8 +20,8 @@ class BusquedaRepository:
     def get_by_id(self, busqueda_id: str) -> Optional[BusquedaModel]:
         return self.db.get(BusquedaModel, busqueda_id)
 
-    def crear(self, solicitud_id: str) -> BusquedaModel:
-        busqueda = BusquedaModel(solicitud_id=solicitud_id)
+    def crear(self, solicitud_id: str, parametros_json: Optional[str] = None) -> BusquedaModel:
+        busqueda = BusquedaModel(solicitud_id=solicitud_id, parametros_json=parametros_json)
         self.db.add(busqueda)
         self.db.commit()
         self.db.refresh(busqueda)
@@ -53,6 +53,18 @@ class BusquedaRepository:
             .order_by(BusquedaModel.created_at.desc())
             .first()
         )
+
+    def listar_de_solicitud(self, solicitud_id: str) -> list[BusquedaModel]:
+        """HU-15: todas las ejecuciones de la solicitud, de la más antigua a la más reciente."""
+        return (
+            self.db.query(BusquedaModel)
+            .filter(BusquedaModel.solicitud_id == solicitud_id)
+            .order_by(BusquedaModel.created_at, BusquedaModel.id)
+            .all()
+        )
+
+    def contar_de_solicitud(self, solicitud_id: str) -> int:
+        return self.db.query(BusquedaModel).filter(BusquedaModel.solicitud_id == solicitud_id).count()
 
     def en_curso_de_solicitud(self, solicitud_id: str, desde: datetime) -> Optional[BusquedaModel]:
         """

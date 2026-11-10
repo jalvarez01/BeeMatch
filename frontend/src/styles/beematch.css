@@ -321,3 +321,22 @@
   .bm-bit-head { display: none; }
 }
 .bm-hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+/* ---------- HU-12: sugerencias de cliente ---------- */
+.bm-suggest { position: relative; flex: 1; min-width: 0; display: flex; }
+.bm-suggest input { width: 100%; }
+.bm-suggest-list {
+  position: absolute; z-index: 20; top: calc(100% + 10px); right: -12px; left: -120px;
+  margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto;
+  background: var(--white); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.bm-suggest-list li { padding: 8px 10px; font-size: 13px; border-radius: 6px; cursor: pointer; text-align: left; }
+.bm-suggest-list li:hover, .bm-suggest-list li[data-active='true'] { background: var(--yellow-soft); }
+
+/* ---------- HU-15: ejecuciones de una solicitud ---------- */
+.bm-exec { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px 4px; }
+.bm-exec + .bm-exec { border-top: 1px solid var(--line); }
+.bm-exec[data-actual='true'] { background: var(--yellow-soft); border-radius: 8px; padding-left: 12px; padding-right: 12px; }
+.bm-exec-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bm-banner-anterior { background: #F4F4F5; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }

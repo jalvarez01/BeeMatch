@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from backend.infrastructure.persistence.models.solicitud import (
     ESTADO_BORRADOR,
+    ESTADO_EN_ANALISIS,
+    ESTADO_ERROR,
     ESTADO_PROCESADA,
     ESTADO_SIN_COINCIDENCIAS,
 )
@@ -18,6 +20,7 @@ from backend.infrastructure.persistence.repositories.solicitud_repo import Solic
 from backend.infrastructure.persistence.repositories.usuario_repo import UsuarioRepository
 from backend.schemas.solicitud import (
     DESCRIPCION_MIN_CARACTERES,
+    AjusteSolicitud,
     CriterioResponse,
     SolicitudCreate,
     SolicitudResponse,
@@ -32,6 +35,11 @@ MENSAJE_DESCRIPCION_CORTA = (
 
 CAMPO_DESCRIPCION = "descripción del perfil"
 CAMPO_ROL = "rol requerido"
+CAMPO_CLIENTE = "cliente"
+
+# HU-12: toda solicitud pertenece a un cliente, para saber qué proyecto de Staff
+# Augmentation originó la búsqueda.
+MENSAJE_CLIENTE_OBLIGATORIO = "Indica el cliente que originó la solicitud."
 
 
 def descripcion_insuficiente(descripcion: Optional[str]) -> bool:
@@ -55,6 +63,28 @@ def campos_faltantes(descripcion: Optional[str], rol: Optional[str]) -> list[str
     faltantes = []
     if not (descripcion or "").strip():
         faltantes.append(CAMPO_DESCRIPCION)
+    if not (rol or "").strip():
+        faltantes.append(CAMPO_ROL)
+    return faltantes
+
+
+def cliente_en_blanco(cliente: Optional[str]) -> bool:
+    """HU-12: ¿falta el cliente? Un texto de solo espacios cuenta como vacío."""
+    return not (cliente or "").strip()
+
+
+def campos_faltantes_busqueda(
+    descripcion: Optional[str], rol: Optional[str], cliente: Optional[str]
+) -> list[str]:
+    """
+    HU-10 y HU-12: lo que falta para poder ejecutar una búsqueda, en el orden del
+    formulario (descripción, cliente, rol).
+    """
+    faltantes = []
+    if not (descripcion or "").strip():
+        faltantes.append(CAMPO_DESCRIPCION)
+    if cliente_en_blanco(cliente):
+        faltantes.append(CAMPO_CLIENTE)
     if not (rol or "").strip():
         faltantes.append(CAMPO_ROL)
     return faltantes
@@ -90,15 +120,37 @@ class SolicitudService:
 
     def actualizar(self, solicitud_id: str, datos: SolicitudUpdate) -> Optional[SolicitudResponse]:
         """
-        HU-15: editar una solicitud procesada no borra su historial; la nueva
-        ejecución genera otra Busqueda (RD1).
+        Actualización parcial: lo que no llega se conserva. Editar una solicitud
+        procesada no borra sus ejecuciones anteriores (HU-15, RD1): cada una guarda
+        su propia copia de los criterios.
+        """
+        solicitud = self.repo.get_by_id(solicitud_id)
+        if not solicitud:
+            return None
+
+        self.repo.actualizar(
+            solicitud,
+            descripcion_libre=datos.descripcion_libre,
+            rol_buscado=datos.rol_buscado,
+            experiencia_min=datos.experiencia_min,
+        )
+        self._actualizar_cliente(solicitud, datos.cliente, datos.proyecto)
+        if datos.criterios is not None:
+            self.repo.reemplazar_criterios(solicitud.id, [c.model_dump() for c in datos.criterios])
+        return self._enriquecer(solicitud)
+
+    def reemplazar(self, solicitud_id: str, datos: AjusteSolicitud) -> Optional[SolicitudResponse]:
+        """
+        HU-15: la solicitud queda exactamente con los criterios ajustados, incluidos
+        los que se quitaron (experiencia mínima, tecnologías). No toca las ejecuciones
+        anteriores: ellas conservan la copia de lo que analizaron.
         """
         solicitud = self.repo.get_by_id(solicitud_id)
         if not solicitud:
             return None
 
         cliente_id, proyecto_id = self._resolver_cliente(datos.cliente, datos.proyecto)
-        self.repo.actualizar(
+        self.repo.reemplazar(
             solicitud,
             descripcion_libre=datos.descripcion_libre,
             rol_buscado=datos.rol_buscado,
@@ -106,8 +158,7 @@ class SolicitudService:
             cliente_id=cliente_id,
             proyecto_id=proyecto_id,
         )
-        if datos.criterios is not None:
-            self.repo.reemplazar_criterios(solicitud.id, [c.model_dump() for c in datos.criterios])
+        self.repo.reemplazar_criterios(solicitud.id, [c.model_dump() for c in datos.criterios])
         return self._enriquecer(solicitud)
 
     def duplicar(self, solicitud_id: str, usuario_id: str) -> Optional[SolicitudResponse]:
@@ -151,24 +202,58 @@ class SolicitudService:
         texto: Optional[str] = None,
         pagina: int = 1,
         por_pagina: int = 10,
+        cliente_id: Optional[str] = None,
     ) -> tuple[list[SolicitudResponse], int]:
-        """HU-13: historial filtrable y paginado."""
+        """HU-13: historial filtrable y paginado. HU-12: también por cliente."""
         solicitudes = self.repo.listar(
-            estado=estado, texto=texto, limite=por_pagina, desplazamiento=(pagina - 1) * por_pagina
+            estado=estado,
+            texto=texto,
+            limite=por_pagina,
+            desplazamiento=(pagina - 1) * por_pagina,
+            cliente_id=cliente_id,
         )
-        return [self._enriquecer(s) for s in solicitudes], self.repo.contar(estado)
+        total = self.repo.contar(estado=estado, texto=texto, cliente_id=cliente_id)
+        return [self._enriquecer(s) for s in solicitudes], total
 
     # --- Internos ------------------------------------------------------------
 
     def _resolver_cliente(
         self, cliente: Optional[str], proyecto: Optional[str]
     ) -> tuple[Optional[str], Optional[str]]:
-        if not cliente:
+        """
+        HU-12: ids del cliente y del proyecto, registrándolos si no existen. Los
+        nombres que solo difieren en mayúsculas o espacios son el mismo registro.
+        """
+        if cliente_en_blanco(cliente):
             return None, None
-        registro = self.clientes.get_o_crear(cliente)
-        if not proyecto:
+        registro = self.clientes.get_o_crear(cliente or "")
+        if not (proyecto or "").strip():
             return registro.id, None
-        return registro.id, self.proyectos.get_o_crear(proyecto, registro.id).id
+        return registro.id, self.proyectos.get_o_crear(proyecto or "", registro.id).id
+
+    def _actualizar_cliente(
+        self, solicitud, cliente: Optional[str], proyecto: Optional[str]
+    ) -> None:
+        """
+        Actualización parcial de cliente y proyecto: lo que no llega se conserva.
+        Si cambia el cliente, el proyecto anterior (que era de otro cliente) se descarta
+        salvo que llegue uno nuevo.
+        """
+        if cliente is None and proyecto is None:
+            return
+
+        cliente_id = solicitud.cliente_id
+        if not cliente_en_blanco(cliente):
+            cliente_id = self.clientes.get_o_crear(cliente or "").id
+
+        if proyecto is None:
+            proyecto_id = solicitud.proyecto_id if cliente_id == solicitud.cliente_id else None
+        elif proyecto.strip() and cliente_id:
+            proyecto_id = self.proyectos.get_o_crear(proyecto, cliente_id).id
+        else:
+            proyecto_id = None
+
+        self.repo.asociar_cliente(solicitud, cliente_id, proyecto_id)
 
     def _enriquecer(self, solicitud) -> SolicitudResponse:
         respuesta = SolicitudResponse.model_validate(solicitud)
@@ -186,6 +271,8 @@ class SolicitudService:
         usuario = self.usuarios.get_by_id(solicitud.usuario_id)
         respuesta.usuario_nombre = usuario.nombre if usuario else None
 
+        respuesta.total_ejecuciones = self.busquedas.contar_de_solicitud(solicitud.id)
+
         # HU-23: una solicitud sin coincidencias también tiene búsqueda, para
         # poder abrir sus resultados desde el historial.
         if solicitud.estado in (ESTADO_PROCESADA, ESTADO_SIN_COINCIDENCIAS):
@@ -198,5 +285,10 @@ class SolicitudService:
                     max(r.puntaje_afinidad for r in recomendaciones) if recomendaciones else None
                 )
                 respuesta.total_preseleccionados = sum(1 for r in recomendaciones if r.preseleccionado)
+        elif solicitud.estado in (ESTADO_EN_ANALISIS, ESTADO_ERROR):
+            # HU-15: una ejecución en curso o fallida también se puede abrir desde el
+            # historial, y desde ahí se llega a las ejecuciones anteriores con resultados.
+            busqueda = self.busquedas.ultima_de_solicitud(solicitud.id)
+            respuesta.busqueda_id = busqueda.id if busqueda else None
 
         return respuesta

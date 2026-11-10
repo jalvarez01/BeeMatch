@@ -21,6 +21,7 @@ from backend.domain.services.bitacora_service import (
     ACCION_ERROR_SERVICIO,
     BitacoraService,
 )
+from backend.domain.services.parametros_busqueda import leer_parametros, parametros_de_solicitud
 from backend.domain.services.parametros_service import ParametrosRecomendacionService
 from backend.infrastructure.llm.embeddings import (
     ProveedorEmbeddings,
@@ -49,8 +50,13 @@ from backend.infrastructure.persistence.models.solicitud import (
 )
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
+from backend.infrastructure.persistence.repositories.cliente_repo import (
+    ClienteRepository,
+    ProyectoRepository,
+)
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
+from backend.schemas.busqueda import ParametrosBusqueda
 
 # Una búsqueda pendiente o ejecutándose más tiempo que esto se da por abandonada.
 # Supera el job_timeout de la cola (900 s), así que ningún trabajo vivo la alcanza.
@@ -73,11 +79,28 @@ class BusquedaService:
         """
         Crea la búsqueda y devuelve su id para que el frontend haga polling.
 
-        Aquí queda el evento de bitácora de HU-06: la búsqueda se crea una sola
-        vez, mientras que el worker (o el respaldo dentro de la API) puede
+        HU-15: guarda con ella una copia de los criterios, el cliente y el proyecto
+        de la solicitud en este momento. Es lo que analiza el worker y lo que muestra
+        la ejecución después, aunque la solicitud se edite o se vuelva a ejecutar.
+
+        Aquí queda también el evento de bitácora de HU-06: la búsqueda se crea una
+        sola vez, mientras que el worker (o el respaldo dentro de la API) puede
         ejecutarla por caminos distintos.
         """
-        busqueda = self.busquedas.crear(solicitud_id)
+        solicitud = self.solicitudes.get_by_id(solicitud_id)
+        parametros = (
+            parametros_de_solicitud(
+                solicitud,
+                self.solicitudes.listar_criterios(solicitud_id),
+                ClienteRepository(self.db),
+                ProyectoRepository(self.db),
+            )
+            if solicitud
+            else None
+        )
+        busqueda = self.busquedas.crear(
+            solicitud_id, parametros_json=parametros.model_dump_json() if parametros else None
+        )
         BitacoraService(self.db).registrar(
             accion=ACCION_BUSQUEDA_EJECUTADA,
             usuario_id=usuario_id,
@@ -107,9 +130,12 @@ class BusquedaService:
             self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_EJECUTANDO)
             self.busquedas.actualizar_progreso(busqueda_id, "Preparando la consulta", 10)
 
-            criterios = self.solicitudes.listar_criterios(solicitud.id)
-            consulta = self._construir_consulta(solicitud, criterios)
-            requisitos = self._construir_requisitos(solicitud, criterios)
+            # HU-15: se analiza la copia guardada al encolar, no la solicitud viva, para
+            # que una edición hecha mientras la búsqueda espera no cambie lo que ya se pidió.
+            pedido = self._parametros_de(busqueda, solicitud)
+            criterios = pedido.criterios
+            consulta = self._construir_consulta(pedido, criterios)
+            requisitos = self._construir_requisitos(pedido, criterios)
 
             # Etapa 1: recuperación híbrida
             self.busquedas.actualizar_progreso(busqueda_id, "Buscando en las hojas de vida", 35)
@@ -120,7 +146,7 @@ class BusquedaService:
             self.busquedas.actualizar_progreso(busqueda_id, "Aplicando requisitos obligatorios", 55)
             finalistas = self._agrupar_por_candidato(fragmentos)
             ids_filtrados = self.filtro.aplicar(
-                [f["candidato_id"] for f in finalistas], solicitud.experiencia_min
+                [f["candidato_id"] for f in finalistas], pedido.experiencia_min
             )
             finalistas = [f for f in finalistas if f["candidato_id"] in ids_filtrados][:FINALISTAS_RERANK]
 
@@ -203,6 +229,18 @@ class BusquedaService:
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
     # --- Internos ------------------------------------------------------------
+
+    def _parametros_de(self, busqueda: BusquedaModel, solicitud) -> ParametrosBusqueda:
+        """La copia de la ejecución; en las anteriores a HU-15, la solicitud tal como está."""
+        guardados = leer_parametros(busqueda)
+        if guardados:
+            return guardados
+        return parametros_de_solicitud(
+            solicitud,
+            self.solicitudes.listar_criterios(solicitud.id),
+            ClienteRepository(self.db),
+            ProyectoRepository(self.db),
+        )
 
     def _construir_consulta(self, solicitud, criterios) -> str:
         partes = [solicitud.descripcion_libre or ""]

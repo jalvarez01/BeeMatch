@@ -50,7 +50,7 @@ class ExportService:
         if not preseleccionados:
             raise ValueError(MENSAJE_SIN_PRESELECCION)
 
-        encabezado = self._encabezado(resultado.solicitud_id)
+        encabezado = self._encabezado(resultado)
         filas = [self._fila(r) for r in preseleccionados]
 
         if formato.upper() == "XLSX":
@@ -59,20 +59,36 @@ class ExportService:
         contenido = self._exportar_pdf(encabezado, filas)
         return ArchivoExportado(contenido, f"preseleccion_{busqueda_id}.pdf", TIPO_PDF)
 
-    def _encabezado(self, solicitud_id: str) -> list[tuple[str, str]]:
-        """Perfil solicitado, cliente y fecha: lo que el cliente necesita para ubicar el listado."""
-        solicitud = self.solicitudes.obtener(solicitud_id)
-        perfil = (solicitud.rol_buscado or solicitud.descripcion_libre or "").strip() if solicitud else ""
+    def _encabezado(self, resultado) -> list[tuple[str, str]]:
+        """
+        Perfil solicitado, cliente y fecha de la ejecución que se exporta (HU-15).
 
-        requisitos = [c.valor for c in solicitud.criterios] if solicitud else []
-        if solicitud and solicitud.experiencia_min:
-            requisitos.append(f"{solicitud.experiencia_min}+ años de experiencia")
+        La solicitud pudo ajustarse después de esa ejecución, así que se usan los criterios
+        que ella guardó; la solicitud actual solo sirve para las anteriores a HU-15.
+        """
+        datos = resultado.parametros
+        if datos is None:
+            solicitud = self.solicitudes.obtener(resultado.solicitud_id)
+            perfil = (solicitud.rol_buscado or solicitud.descripcion_libre or "").strip() if solicitud else ""
+            requisitos = [c.valor for c in solicitud.criterios] if solicitud else []
+            experiencia = solicitud.experiencia_min if solicitud else None
+            cliente = solicitud.cliente_nombre if solicitud else None
+            proyecto = solicitud.proyecto_nombre if solicitud else None
+        else:
+            perfil = (datos.rol_buscado or datos.descripcion_libre or "").strip()
+            requisitos = [c.valor for c in datos.criterios]
+            experiencia = datos.experiencia_min
+            cliente = datos.cliente
+            proyecto = datos.proyecto
+
+        if experiencia:
+            requisitos.append(f"{experiencia}+ años de experiencia")
 
         return [
             ("Perfil solicitado", perfil or "Sin perfil definido"),
             ("Requisitos", ", ".join(requisitos) or "Sin requisitos adicionales"),
-            ("Cliente", (solicitud.cliente_nombre if solicitud else None) or "Sin cliente asignado"),
-            ("Proyecto", (solicitud.proyecto_nombre if solicitud else None) or "Sin proyecto asignado"),
+            ("Cliente", cliente or "Sin cliente asignado"),
+            ("Proyecto", proyecto or "Sin proyecto asignado"),
             ("Fecha", datetime.now().strftime("%d/%m/%Y")),
         ]
 

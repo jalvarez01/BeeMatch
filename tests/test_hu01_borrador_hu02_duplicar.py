@@ -10,6 +10,7 @@ def _crear_solicitud(cliente, cabeceras, estado="BORRADOR"):
         json={
             "descripcion_libre": "Perfil backend para un proyecto nuevo",
             "rol_buscado": "Backend",
+            "cliente": "Bancolombia",  # HU-12: toda solicitud lleva cliente
             "criterios": [
                 {"tipo": "TECNOLOGIA", "valor": "Python", "obligatorio": True, "peso": 2}
             ],

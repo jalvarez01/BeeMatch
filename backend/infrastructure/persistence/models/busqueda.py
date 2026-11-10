@@ -36,6 +36,11 @@ class BusquedaModel(Base):
     tokens_entrada: Mapped[int] = mapped_column(Integer, default=0)
     tokens_salida: Mapped[int] = mapped_column(Integer, default=0)
     mensaje_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # HU-15: copia (JSON) de lo que se analizó en esta ejecución: criterios,
+    # cliente y proyecto. La solicitud se puede editar y volver a ejecutar; sin
+    # esta copia las ejecuciones anteriores mostrarían los criterios nuevos.
+    # Nula en las ejecuciones anteriores a HU-15.
+    parametros_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
