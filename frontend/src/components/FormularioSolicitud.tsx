@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { listarRoles } from '../api/candidatos'
+import { GRUPOS_CRITERIO, type CampoCriterio } from '../lib/criterios'
 import {
   DESCRIPCION_MAX,
   experienciaValida,
@@ -23,10 +24,18 @@ interface Props {
   prefijo?: string
 }
 
+/** HU-09: ejemplo de lo que va en cada campo de varios valores. */
+const PLACEHOLDER_GRUPO: Record<CampoCriterio, string> = {
+  tecnologias: 'Ej. Java, Python, AWS…',
+  frameworks: 'Ej. Spring Boot, React…',
+  otros: 'Ej. Sector bancario, Scrum…',
+  idiomas: 'Agregar idioma…',
+}
+
 /**
  * Formulario de la solicitud: descripción, cliente, proyecto, rol, experiencia,
- * tecnologías e idiomas. Lo usan la pantalla de nueva búsqueda y el panel
- * "Ajustar criterios" de los resultados (HU-08 a HU-12, HU-15).
+ * tecnologías, frameworks, otros conocimientos e idiomas. Lo usan la pantalla de
+ * nueva búsqueda y el panel "Ajustar criterios" de los resultados (HU-08 a HU-12, HU-15).
  */
 export default function FormularioSolicitud({
   valores,
@@ -94,7 +103,9 @@ export default function FormularioSolicitud({
 
       <h2 className="bm-h2">Detalles de la solicitud</h2>
       <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px' }}>
-        Agrega contexto para mejorar la precisión de las recomendaciones.
+        Agrega contexto para mejorar la precisión de las recomendaciones. En tecnologías,
+        frameworks, otros conocimientos e idiomas puedes registrar varios valores: escribe cada
+        uno y presiona Enter o coma.
       </p>
 
       <div className="bm-grid2">
@@ -184,23 +195,18 @@ export default function FormularioSolicitud({
           <MensajeError id={`${id('experiencia')}-error`} mensaje={errores.experiencia} />
         </div>
 
-        <CampoChips
-          id={`${prefijo}tecnologias`}
-          etiqueta="Tecnologías y habilidades"
-          placeholder="Buscar tecnología…"
-          valores={valores.tecnologias}
-          onCambio={(tecnologias) => cambiar({ tecnologias })}
-          deshabilitado={deshabilitado}
-        />
-
-        <CampoChips
-          id={`${prefijo}idiomas`}
-          etiqueta="Idiomas"
-          placeholder="Agregar idioma…"
-          valores={valores.idiomas}
-          onCambio={(idiomas) => cambiar({ idiomas })}
-          deshabilitado={deshabilitado}
-        />
+        {/* HU-09: un campo por grupo de criterios, todos con varios valores. */}
+        {GRUPOS_CRITERIO.map((grupo) => (
+          <CampoChips
+            key={grupo.campo}
+            id={`${prefijo}${grupo.campo}`}
+            etiqueta={grupo.etiqueta}
+            placeholder={PLACEHOLDER_GRUPO[grupo.campo]}
+            valores={valores[grupo.campo]}
+            onCambio={(lista) => cambiar({ [grupo.campo]: lista })}
+            deshabilitado={deshabilitado}
+          />
+        ))}
       </div>
     </>
   )
@@ -230,20 +236,40 @@ function CampoChips({
   onCambio: (valores: string[]) => void
   deshabilitado?: boolean
 }) {
-  const agregar = (evento: React.KeyboardEvent<HTMLInputElement>) => {
-    if (evento.key !== 'Enter') return
-    evento.preventDefault()
-    const entrada = evento.currentTarget
-    const valor = entrada.value.trim()
-    if (valor && !valores.includes(valor)) onCambio([...valores, valor])
+  // HU-09: varios valores a la vez ("Java, Python") y sin repetir uno ya agregado,
+  // aunque cambien las mayúsculas.
+  const agregar = (entrada: HTMLInputElement) => {
+    const registrados = new Set(valores.map((v) => v.toLocaleLowerCase('es')))
+    const nuevos: string[] = []
+    for (const texto of entrada.value.split(',')) {
+      const valor = texto.trim()
+      const clave = valor.toLocaleLowerCase('es')
+      if (!valor || registrados.has(clave)) continue
+      registrados.add(clave)
+      nuevos.push(valor)
+    }
+    if (nuevos.length > 0) onCambio([...valores, ...nuevos])
     entrada.value = ''
+  }
+
+  const alPresionar = (evento: React.KeyboardEvent<HTMLInputElement>) => {
+    if (evento.key !== 'Enter' && evento.key !== ',') return
+    evento.preventDefault()
+    agregar(evento.currentTarget)
   }
 
   return (
     <div className="bm-field-chips">
       <div className="bm-field">
         <label htmlFor={id}>{etiqueta}</label>
-        <input id={id} placeholder={placeholder} onKeyDown={agregar} disabled={deshabilitado} />
+        {/* Al salir del campo también se agrega lo escrito, para que no se pierda al buscar. */}
+        <input
+          id={id}
+          placeholder={placeholder}
+          onKeyDown={alPresionar}
+          onBlur={(evento) => agregar(evento.currentTarget)}
+          disabled={deshabilitado}
+        />
       </div>
       {valores.length > 0 && (
         <div className="bm-chips">

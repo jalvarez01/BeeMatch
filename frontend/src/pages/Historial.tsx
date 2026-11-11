@@ -5,6 +5,7 @@ import { ejecutarBusqueda } from '../api/busquedas'
 import { listarClientes } from '../api/clientes'
 import { duplicarSolicitud, eliminarSolicitud, listarHistorial } from '../api/solicitudes'
 import { EstadoBadge } from '../components/Badges'
+import CriteriosSolicitud from '../components/CriteriosSolicitud'
 import { IconSearch } from '../components/Icons'
 import { formatearFecha } from '../lib/formato'
 import type { ClienteSugerido, EstadoSolicitud, Solicitud } from '../types'
@@ -19,7 +20,7 @@ const FILTROS: { valor: EstadoSolicitud | ''; etiqueta: string }[] = [
 
 const POR_PAGINA = 10
 
-/** HU-12, HU-13, HU-14, HU-15. */
+/** HU-09, HU-12, HU-13, HU-14, HU-15. */
 export default function Historial() {
   const navegar = useNavigate()
 
@@ -178,6 +179,11 @@ export default function Historial() {
                   .filter(Boolean)
                   .join(' · ')}
               </div>
+              {/* HU-09: los criterios registrados quedan a la vista al consultar la solicitud. */}
+              <CriteriosSolicitud
+                criterios={solicitud.criterios}
+                experienciaMin={solicitud.experiencia_min}
+              />
               <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 6 }}>
                 {formatearFecha(solicitud.created_at)} · Creada por {solicitud.usuario_nombre}
               </div>

@@ -1,7 +1,7 @@
 /**
  * Lógica del formulario de solicitud, sin React: valores iniciales, validación y el
  * cuerpo que se envía al servidor. La comparten la pantalla de nueva búsqueda y el
- * panel "Ajustar criterios" de los resultados (HU-10, HU-12, HU-15).
+ * panel "Ajustar criterios" de los resultados (HU-09, HU-10, HU-12, HU-15).
  */
 
 import type {
@@ -10,8 +10,9 @@ import type {
   ParametrosBusqueda,
   Solicitud,
   SolicitudPayload,
-  TipoCriterio,
 } from '../types'
+// Con extensión: `npm test` corre este módulo directamente con Node, sin compilar.
+import { GRUPOS_CRITERIO, valoresDelGrupo, type GrupoCriterio } from './criterios.ts'
 
 export const DESCRIPCION_MIN = 15
 export const DESCRIPCION_MAX = 1000
@@ -36,12 +37,15 @@ export interface ValoresSolicitud {
   proyecto: string
   rol: string
   experiencia: number | ''
+  // HU-09: un campo por grupo de criterios, cada uno con varios valores.
   tecnologias: string[]
+  frameworks: string[]
+  otros: string[]
   idiomas: string[]
   /**
    * Criterios con los que se abrió el formulario. El formulario solo edita el texto de
-   * tecnologías e idiomas; esta copia permite conservar el tipo, el peso y lo obligatorio
-   * de los que no se tocaron, en lugar de aplanarlos.
+   * cada grupo; esta copia permite conservar el tipo, el peso y lo obligatorio de los
+   * que no se tocaron, en lugar de aplanarlos.
    */
   criteriosOriginales: Criterio[]
 }
@@ -64,6 +68,8 @@ export function valoresVacios(): ValoresSolicitud {
     rol: '',
     experiencia: '',
     tecnologias: [],
+    frameworks: [],
+    otros: [],
     idiomas: [],
     criteriosOriginales: [],
   }
@@ -88,30 +94,44 @@ export function valoresDesde(origen: OrigenCriterios | ParametrosBusqueda): Valo
     proyecto: origen.proyecto ?? '',
     rol: origen.rol_buscado ?? '',
     experiencia: origen.experiencia_min ?? '',
-    tecnologias: origen.criterios.filter((c) => c.tipo !== 'IDIOMA').map((c) => c.valor),
-    idiomas: origen.criterios.filter((c) => c.tipo === 'IDIOMA').map((c) => c.valor),
+    // HU-09: cada criterio vuelve al campo de su tipo (un framework no se mezcla con las tecnologías).
+    tecnologias: valoresDelGrupo(origen.criterios, 'tecnologias'),
+    frameworks: valoresDelGrupo(origen.criterios, 'frameworks'),
+    otros: valoresDelGrupo(origen.criterios, 'otros'),
+    idiomas: valoresDelGrupo(origen.criterios, 'idiomas'),
     criteriosOriginales: origen.criterios,
   }
 }
 
-function criterioNuevo(valor: string, tipo: TipoCriterio): Criterio {
-  return { tipo, valor, obligatorio: false, peso: 1 }
-}
-
-/** Un criterio que ya existía conserva su tipo, peso y obligatoriedad; uno nuevo parte de cero. */
-function criterioDe(valores: ValoresSolicitud, valor: string, esIdioma: boolean): Criterio {
+/**
+ * Un criterio que ya existía en el mismo campo conserva su tipo, peso y obligatoriedad;
+ * uno nuevo toma el tipo principal del campo donde se escribió.
+ */
+function criterioDe(valores: ValoresSolicitud, valor: string, grupo: GrupoCriterio): Criterio {
   const previo = valores.criteriosOriginales.find(
-    (c) => c.valor === valor && (c.tipo === 'IDIOMA') === esIdioma,
+    (c) => c.valor === valor && grupo.tipos.includes(c.tipo),
   )
   if (previo) return { tipo: previo.tipo, valor, obligatorio: previo.obligatorio, peso: previo.peso }
-  return criterioNuevo(valor, esIdioma ? 'IDIOMA' : 'TECNOLOGIA')
+  return { tipo: grupo.tipos[0], valor, obligatorio: false, peso: 1 }
 }
 
+/**
+ * Criterios de todos los campos. Los que ya existían mantienen su orden original y los
+ * nuevos van al final: confirmar un ajuste sin cambios reenvía exactamente lo mismo (HU-15).
+ */
 function criteriosDe(valores: ValoresSolicitud): Criterio[] {
-  return [
-    ...valores.tecnologias.map((valor) => criterioDe(valores, valor, false)),
-    ...valores.idiomas.map((valor) => criterioDe(valores, valor, true)),
-  ]
+  const posicionOriginal = (criterio: Criterio) => {
+    const indice = valores.criteriosOriginales.findIndex(
+      (c) => c.valor === criterio.valor && c.tipo === criterio.tipo,
+    )
+    return indice === -1 ? Number.POSITIVE_INFINITY : indice
+  }
+  return GRUPOS_CRITERIO.flatMap((grupo) =>
+    valores[grupo.campo].map((valor) => criterioDe(valores, valor, grupo)),
+  )
+    .map((criterio, orden) => ({ criterio, orden, posicion: posicionOriginal(criterio) }))
+    .sort((a, b) => a.posicion - b.posicion || a.orden - b.orden)
+    .map(({ criterio }) => criterio)
 }
 
 /** Cuerpo para crear o actualizar una solicitud. */
@@ -187,8 +207,7 @@ export function mismosCriterios(a: ValoresSolicitud, b: ValoresSolicitud): boole
       normalizarNombre(v.proyecto),
       v.rol.trim(),
       v.experiencia,
-      [...v.tecnologias].sort(),
-      [...v.idiomas].sort(),
+      ...GRUPOS_CRITERIO.map((grupo) => [...v[grupo.campo]].sort()),
     ])
   return claveDe(a) === claveDe(b)
 }

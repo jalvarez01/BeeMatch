@@ -340,3 +340,9 @@
 .bm-exec[data-actual='true'] { background: var(--yellow-soft); border-radius: 8px; padding-left: 12px; padding-right: 12px; }
 .bm-exec-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .bm-banner-anterior { background: #F4F4F5; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- HU-09: criterios estructurados de la solicitud ---------- */
+.bm-criterios { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; }
+.bm-criterios-grupo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.bm-criterios-grupo dt { font-size: 11px; color: var(--muted-2); }
+.bm-criterios-grupo dd { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 0; }

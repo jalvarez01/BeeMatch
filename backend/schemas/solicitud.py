@@ -3,7 +3,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-TipoCriterio = Literal["TECNOLOGIA", "FRAMEWORK", "DOMINIO", "CERTIFICACION", "IDIOMA"]
+# HU-09: OTRO recoge el campo "Otros conocimientos" (sector, metodologías, normas…),
+# que no encaja en tecnología, framework ni idioma.
+TipoCriterio = Literal["TECNOLOGIA", "FRAMEWORK", "DOMINIO", "CERTIFICACION", "IDIOMA", "OTRO"]
 DESCRIPCION_MIN_CARACTERES = 15
 DESCRIPCION_MAX_CARACTERES = 1000
 EXPERIENCIA_MAX_ANIOS = 50

@@ -112,7 +112,9 @@ test('los criterios de la ejecución son los valores iniciales del ajuste, con c
   assert.equal(valores.proyecto, 'Core Bancario')
   assert.equal(valores.rol, 'Desarrollador Backend')
   assert.equal(valores.experiencia, 5)
-  assert.deepEqual(valores.tecnologias, ['Spring Boot', 'Java'])
+  // HU-09: cada criterio vuelve a su propio campo.
+  assert.deepEqual(valores.tecnologias, ['Java'])
+  assert.deepEqual(valores.frameworks, ['Spring Boot'])
   assert.deepEqual(valores.idiomas, ['Inglés B2'])
 })
 
@@ -125,15 +127,22 @@ test('abrir el ajuste y confirmar sin tocar nada reenvía los mismos criterios',
 })
 
 test('el ajuste conserva tipo, peso y obligatoriedad de lo que no se tocó y crea lo nuevo', () => {
-  const valores = { ...valoresDesde(PARAMETROS), tecnologias: ['Spring Boot', 'Python'] }
+  const valores = { ...valoresDesde(PARAMETROS), tecnologias: ['Java', 'Python'] }
   const criterios: Criterio[] = construirAjuste(valores).criterios
   assert.deepEqual(criterios[0], { tipo: 'FRAMEWORK', valor: 'Spring Boot', obligatorio: true, peso: 2.5 })
-  assert.deepEqual(criterios[1], { tipo: 'TECNOLOGIA', valor: 'Python', obligatorio: false, peso: 1 })
   assert.deepEqual(criterios[2].tipo, 'IDIOMA')
+  // Lo nuevo va después de lo que ya existía.
+  assert.deepEqual(criterios[3], { tipo: 'TECNOLOGIA', valor: 'Python', obligatorio: false, peso: 1 })
 })
 
 test('lo que se quita del ajuste no se envía', () => {
-  const valores = { ...valoresDesde(PARAMETROS), tecnologias: [], idiomas: [], experiencia: '' as const }
+  const valores = {
+    ...valoresDesde(PARAMETROS),
+    tecnologias: [],
+    frameworks: [],
+    idiomas: [],
+    experiencia: '' as const,
+  }
   const ajuste = construirAjuste(valores)
   assert.deepEqual(ajuste.criterios, [])
   assert.equal(ajuste.experiencia_min, null)

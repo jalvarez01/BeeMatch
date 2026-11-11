@@ -21,6 +21,8 @@ export type TipoCriterio =
   | 'DOMINIO'
   | 'CERTIFICACION'
   | 'IDIOMA'
+  /** HU-09: el campo "Otros conocimientos" (sector, metodologías, normas…). */
+  | 'OTRO'
 
 export interface Usuario {
   id: string
