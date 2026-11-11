@@ -46,6 +46,9 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 
 @app.on_event("startup")
 def on_startup():
+    from backend.produccion import validar_configuracion_de_produccion
+
+    validar_configuracion_de_produccion()
     init_db()
     _informar_cola()
     _sembrar_parametros()
@@ -237,4 +240,33 @@ def _sembrar_repositorio():
 
 @app.get("/health")
 def health():
+    """Vivacidad: el proceso responde. No toca la base ni Redis."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """
+    Disponibilidad: la base responde. Redis se informa pero no tumba el estado,
+    porque sin Redis la API sigue trabajando (ver docs/redis-y-worker.md).
+    Es lo que consultan el healthcheck del contenedor y el balanceador.
+    """
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+
+    from backend.infrastructure.persistence.database import engine
+    from backend.workers.queue import get_cola, hay_workers
+
+    try:
+        with engine.connect() as conexion:
+            conexion.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("La base de datos no responde.")
+        return JSONResponse(status_code=503, content={"status": "error", "base_de_datos": "no responde"})
+
+    cola = get_cola()
+    if cola is None:
+        redis = "no disponible"
+    else:
+        redis = "con worker" if hay_workers(cola) else "sin worker"
+    return {"status": "ok", "base_de_datos": "ok", "redis": redis}

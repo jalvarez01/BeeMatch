@@ -1,0 +1,29 @@
+# Un solo punto de entrada para el navegador:
+#   /api/*  ->  la API (sin el prefijo /api)
+#   todo lo demás  ->  la aplicación React (con recarga en cualquier ruta)
+#
+# SITIO define la dirección:
+#   SITIO=:80                      HTTP plano, para probar con la IP del servidor.
+#   SITIO=beematch.ejemplo.com     HTTPS automático (Let's Encrypt). Requiere que el
+#                                  dominio apunte al servidor y los puertos 80 y 443
+#                                  abiertos en el grupo de seguridad.
+{$SITIO::80} {
+	encode gzip
+
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+}

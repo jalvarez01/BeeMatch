@@ -10,6 +10,13 @@ COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend ./backend
+# Scripts operativos (migración de datos, reindexación): se ejecutan dentro del
+# contenedor con `docker compose exec api python -m scripts.<nombre>`.
+COPY scripts ./scripts
+
+# La API no necesita ser root.
+RUN useradd --create-home --uid 1000 beematch && chown -R beematch:beematch /app
+USER beematch
 
 EXPOSE 8000
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
