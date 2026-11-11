@@ -1,0 +1,21 @@
+# Contexto de construcción de las imágenes: lo que no se necesita dentro de ellas.
+.git
+.github
+.venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+data
+storage
+BeeMatch.wiki
+beematch-credenciales.json
+*.pem
+*.key
+frontend/node_modules
+frontend/dist
+tests
+docs

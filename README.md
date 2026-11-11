@@ -128,6 +128,10 @@ Con `docker compose up` (API y worker en contenedores) el worker se arranca con
 sincronización periódica del repositorio corre en un solo proceso. Detalle, pruebas y qué pasa
 cuando Redis o el worker se caen en [`docs/redis-y-worker.md`](docs/redis-y-worker.md).
 
+**Despliegue en un servidor (AWS EC2)**
+
+`docker-compose.prod.yml` levanta todo (PostgreSQL con pgvector, Redis, API, worker y el frontend servido por Caddy con HTTPS automático) y `scripts/aws/` trae los scripts de arranque, despliegue, respaldo y restauración. Guía completa, costos y lista de verificación en [`docs/despliegue-aws.md`](docs/despliegue-aws.md).
+
 **Frontend**
 
 ```bash

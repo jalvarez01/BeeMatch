@@ -73,6 +73,12 @@ UMBRAL_AFINIDAD_MINIMA = float(os.getenv("UMBRAL_AFINIDAD_MINIMA", "60"))
 CHUNK_TAMANIO = int(os.getenv("CHUNK_TAMANIO", "1200"))
 CHUNK_SOLAPAMIENTO = int(os.getenv("CHUNK_SOLAPAMIENTO", "200"))
 
+# --- Entorno -----------------------------------------------------------------
+# "produccion" activa las validaciones de arranque de backend/produccion.py: la
+# API se niega a iniciar con secretos de ejemplo o con una base de desarrollo.
+ENTORNO = os.getenv("ENTORNO", "desarrollo").strip().lower()
+ES_PRODUCCION = ENTORNO in ("produccion", "producción", "production", "prod")
+
 # --- Seguridad ---------------------------------------------------------------
 JWT_SECRET = os.getenv("JWT_SECRET", "beematch-dev-secret-cambiar-en-produccion")
 
