@@ -227,7 +227,7 @@ Ya está:
 Falta o conviene revisar:
 - **HTTPS** exige un dominio (paso 7).
 - SSH abierto solo a tu IP: si cambia, actualiza el grupo de seguridad.
-- No hay inicio de sesión corporativo (Entra ID): ver [`pendientes-de-arquitectura.md`](pendientes-de-arquitectura.md).
+- No hay inicio de sesión corporativo (Entra ID): ver [`estado-de-la-arquitectura.md`](estado-de-la-arquitectura.md).
 - Los respaldos fuera de la instancia son opcionales y requieren configurar el bucket.
 
 ## Lo que NO se pudo probar sin AWS
