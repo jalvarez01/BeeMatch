@@ -14,12 +14,16 @@ Dos reglas que valen para todo el paquete:
 import os
 import tempfile
 
-os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(
-    tempfile.mkdtemp(prefix="beematch-pruebas-"), "pruebas.db"
+# Por defecto, SQLite temporal. Con PRUEBAS_DATABASE_URL (un PostgreSQL con
+# pgvector, como el del CI) la misma suite corre contra el motor de producción.
+os.environ["DATABASE_URL"] = os.getenv("PRUEBAS_DATABASE_URL") or (
+    "sqlite:///" + os.path.join(tempfile.mkdtemp(prefix="beematch-pruebas-"), "pruebas.db")
 )
 
 import pytest  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 
+from backend.config import USA_PGVECTOR  # noqa: E402
 from backend.infrastructure.persistence import models  # noqa: E402,F401  (registra las tablas)
 from backend.infrastructure.persistence.database import Base, SessionLocal, engine  # noqa: E402
 from backend.infrastructure.persistence.models.usuario import UsuarioModel  # noqa: E402
@@ -65,6 +69,9 @@ class ClienteFalso(RepositorioDocumentos):
 @pytest.fixture(autouse=True)
 def base_limpia():
     """Cada prueba arranca con las tablas vacías."""
+    if USA_PGVECTOR:
+        with engine.begin() as conexion:
+            conexion.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
