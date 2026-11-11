@@ -214,6 +214,29 @@ Los respaldos quedan **en el mismo disco**: protegen de un error de la aplicaci�
 1. `./scripts/aws/desplegar.sh` ya hace un respaldo previo.
 2. Si algo sale mal: `git checkout <commit-anterior>`, `SIN_GIT=1 ./scripts/aws/desplegar.sh`; y si el problema fue de datos, `restaurar.sh` con el respaldo previo.
 
+## Observabilidad
+
+- **Logs en JSON** (una línea por evento) en producción; legibles en desarrollo. Se fuerza con `LOG_FORMATO=json|texto`, el nivel con `LOG_NIVEL`.
+- **Identificador de petición:** cada respuesta trae `X-Request-ID` y todos los logs de esa petición lo llevan. Si un usuario reporta un error, con ese id se encuentra el evento:
+  ```bash
+  docker compose -f docker-compose.prod.yml --env-file .env.production logs api | grep 3f9c2a1b7e44
+  docker compose ... logs api | jq 'select(.estado >= 500)'
+  ```
+- Se registra método, ruta, estado y duración. **Nunca** el cuerpo ni la query string (ahí viajan contraseñas y tokens). Los llamados salientes de `httpx` (Drive, Graph, OpenAI) se silencian por la misma razón.
+- `/health` y `/health/ready` no se registran, para que el healthcheck no llene el log.
+- **Sentry (opcional):** con `SENTRY_DSN` en `.env.production` se envían las excepciones no controladas, sin datos personales (`send_default_pii=False`). Sin DSN no hace nada.
+
+## Secretos
+
+Los secretos viven en `.env.production` (permisos `600`). Para no perderlos si se pierde la instancia y poder recrearla, `scripts/aws/secretos-ssm.sh` los guarda en **AWS Systems Manager Parameter Store** como `SecureString` (cifrados con KMS; el nivel estándar no cuesta):
+
+```bash
+./scripts/aws/secretos-ssm.sh subir    # .env.production -> /beematch/prod/*   (desde tu máquina o la instancia)
+SOBRESCRIBIR=1 ./scripts/aws/secretos-ssm.sh bajar    # en un servidor nuevo: recrea .env.production
+```
+
+Necesita la CLI de AWS y permisos `ssm:PutParameter`, `ssm:GetParametersByPath` y `kms:Decrypt`. Probado con una `aws` simulada (omite comentarios y vacíos, conserva valores con `=` y espacios, deja el archivo en `600`, no pisa uno existente); **no se probó contra AWS real**, y en Learner Lab Systems Manager puede estar restringido. Si lo está, guarda los valores en un gestor de contraseñas. Nota: `put-parameter` recibe el valor como argumento, visible un instante en la lista de procesos del mismo equipo.
+
 ## Seguridad: lo que ya está y lo que falta
 
 Ya está:

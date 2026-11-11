@@ -79,6 +79,13 @@ CHUNK_SOLAPAMIENTO = int(os.getenv("CHUNK_SOLAPAMIENTO", "200"))
 ENTORNO = os.getenv("ENTORNO", "desarrollo").strip().lower()
 ES_PRODUCCION = ENTORNO in ("produccion", "producción", "production", "prod")
 
+# --- Observabilidad (C27) ----------------------------------------------------
+# auto = JSON en producción y texto legible en desarrollo.
+LOG_FORMATO = os.getenv("LOG_FORMATO", "auto").strip().lower()
+LOG_NIVEL = os.getenv("LOG_NIVEL", "INFO").strip().upper()
+# Vacío = Sentry apagado.
+SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
+
 # --- Seguridad ---------------------------------------------------------------
 JWT_SECRET = os.getenv("JWT_SECRET", "beematch-dev-secret-cambiar-en-produccion")
 

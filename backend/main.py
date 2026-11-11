@@ -17,6 +17,10 @@ from backend.api import (
 from backend.config import ALLOWED_ORIGINS, PLANIFICADOR_EN_API
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import init_db
+from backend.logging_config import RegistroDePeticiones, configurar_logging, iniciar_sentry
+
+configurar_logging()
+iniciar_sentry()
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(RegistroDePeticiones)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
