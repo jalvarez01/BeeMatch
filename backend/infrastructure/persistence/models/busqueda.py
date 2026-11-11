@@ -77,7 +77,9 @@ class CoincidenciaModel(Base):
     requisito: Mapped[str] = mapped_column(String(160))
     estado: Mapped[str] = mapped_column(String(20), default=COINCIDENCIA_NO_EVIDENCIADO)
     evidencia_texto: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    fragmento_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("fragmentos_cv.id"), nullable=True)
+    fragmento_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("fragmentos_cv.id"), nullable=True
+    )
 
 
 class PreseleccionModel(Base):

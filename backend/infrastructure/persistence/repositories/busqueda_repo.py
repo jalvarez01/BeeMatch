@@ -87,7 +87,9 @@ class BusquedaRepository:
 
     # --- Recomendaciones y coincidencias -------------------------------------
 
-    def guardar_recomendaciones(self, busqueda_id: str, recomendaciones: list[dict]) -> list[RecomendacionModel]:
+    def guardar_recomendaciones(
+        self, busqueda_id: str, recomendaciones: list[dict]
+    ) -> list[RecomendacionModel]:
         """
         Persiste el Top-N con su desglose. Cada coincidencia con evidencia debe
         traer fragmento_id (RD3).

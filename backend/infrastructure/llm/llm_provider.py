@@ -95,7 +95,9 @@ class ProveedorLLM:
                 if intento < max_reintentos - 1:
                     time.sleep(2**intento)
 
-        raise ServicioIAError(f"El servicio de IA no respondió tras {max_reintentos} intentos: {ultimo_error}")
+        raise ServicioIAError(
+            f"El servicio de IA no respondió tras {max_reintentos} intentos: {ultimo_error}"
+        )
 
     def _llamar(self, system: str, prompt: str) -> tuple[str, int, int]:
         """Una llamada al modelo. Retorna (texto, tokens_entrada, tokens_salida)."""
@@ -146,4 +148,4 @@ class ProveedorLLM:
         try:
             return json.loads(texto.strip())
         except json.JSONDecodeError as exc:
-            raise ServicioIAError(f"El modelo devolvió un JSON inválido: {exc}")
+            raise ServicioIAError(f"El modelo devolvió un JSON inválido: {exc}") from exc

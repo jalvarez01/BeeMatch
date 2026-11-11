@@ -66,10 +66,10 @@ def sincronizar(
     try:
         resultado = sincronizar_y_encolar()
     except RepositorioNoConfiguradoError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         # HU-26: el error se explica, no se traga.
-        raise HTTPException(status_code=502, detail=f"No fue posible sincronizar: {exc}")
+        raise HTTPException(status_code=502, detail=f"No fue posible sincronizar: {exc}") from exc
     BitacoraService(db).registrar(ACCION_SINCRONIZACION, usuario_id=current_user.id)
 
     aplazados = resultado["documentos_aplazados"]

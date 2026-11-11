@@ -119,7 +119,7 @@ class IndexacionService:
             return False
 
         vectores = self.embeddings.generar([f["texto"] for f in fragmentos])
-        for fragmento, vector in zip(fragmentos, vectores):
+        for fragmento, vector in zip(fragmentos, vectores, strict=False):
             fragmento["embedding"] = serializar(vector)
 
         guardados = self.candidatos.reemplazar_fragmentos(hoja_id, fragmentos)

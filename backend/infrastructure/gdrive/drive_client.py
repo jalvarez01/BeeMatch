@@ -318,7 +318,7 @@ class GoogleDriveClient(RepositorioDocumentos):
             )
             respuesta.raise_for_status()
         except httpx.HTTPError as exc:
-            raise RepositorioError(f"No fue posible descargar el documento: {exc}")
+            raise RepositorioError(f"No fue posible descargar el documento: {exc}") from exc
 
         return respuesta.content
 
@@ -390,7 +390,7 @@ class GoogleDriveClient(RepositorioDocumentos):
         try:
             respuesta = httpx.get(url, params=parametros, headers=self._headers(), timeout=60)
         except httpx.HTTPError as exc:
-            raise RepositorioError(f"Error de red consultando Google Drive: {exc}")
+            raise RepositorioError(f"Error de red consultando Google Drive: {exc}") from exc
 
         if respuesta.status_code == 401:
             raise CredencialesInvalidasError(
