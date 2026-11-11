@@ -42,7 +42,8 @@ class CriterioModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=nuevo_id)
     solicitud_id: Mapped[str] = mapped_column(String(36), ForeignKey("solicitudes.id"), index=True)
-    tipo: Mapped[str] = mapped_column(String(20))  # TECNOLOGIA, FRAMEWORK, DOMINIO, CERTIFICACION, IDIOMA
+    # TECNOLOGIA, FRAMEWORK, DOMINIO, CERTIFICACION, IDIOMA, OTRO (HU-09: otros conocimientos)
+    tipo: Mapped[str] = mapped_column(String(20))
     valor: Mapped[str] = mapped_column(String(120))
     obligatorio: Mapped[bool] = mapped_column(Boolean, default=False)
     peso: Mapped[float] = mapped_column(Float, default=1.0)

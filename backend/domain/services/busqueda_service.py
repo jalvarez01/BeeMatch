@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.config import FINALISTAS_RERANK
+from backend.domain.matching.criterios import lineas_de_criterios
 from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
@@ -243,13 +244,18 @@ class BusquedaService:
         )
 
     def _construir_consulta(self, solicitud, criterios) -> str:
+        """
+        HU-09: combina todo lo diligenciado (descripción, rol, experiencia y cada
+        grupo de criterios) en una sola consulta. Los grupos van con su nombre
+        (tecnologías, frameworks, otros conocimientos, idiomas) para que el
+        análisis distinga qué pidió la coordinadora en cada campo.
+        """
         partes = [solicitud.descripcion_libre or ""]
         if solicitud.rol_buscado:
             partes.append(f"Rol: {solicitud.rol_buscado}")
         if solicitud.experiencia_min:
             partes.append(f"Experiencia mínima: {solicitud.experiencia_min} años")
-        if criterios:
-            partes.append("Requisitos: " + ", ".join(c.valor for c in criterios))
+        partes.extend(lineas_de_criterios(criterios))
         return "\n".join(p for p in partes if p)
 
     def _construir_requisitos(self, solicitud, criterios) -> list[str]:

@@ -15,6 +15,7 @@ import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
 import { AfinidadBadge, AfinidadPorcentaje, LeyendaAfinidad, Tag } from '../components/Badges'
 import BarraProgreso from '../components/BarraProgreso'
+import CriteriosSolicitud from '../components/CriteriosSolicitud'
 import EstadoVacio from '../components/EstadoVacio'
 import FormularioSolicitud from '../components/FormularioSolicitud'
 import { IconSpark } from '../components/Icons'
@@ -40,7 +41,7 @@ const MENSAJE_SIN_PRESELECCION = 'Debes seleccionar al menos un candidato para e
 
 const PREFIJO_AJUSTE = 'ajuste-'
 
-/** HU-12, HU-15, HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
+/** HU-09, HU-12, HU-15, HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
 export default function Resultados() {
   const { busquedaId = '' } = useParams()
   const navegar = useNavigate()
@@ -255,7 +256,7 @@ export default function Resultados() {
   const clienteNombre = parametros ? parametros.cliente : (solicitud?.cliente_nombre ?? null)
   const proyectoNombre = parametros ? parametros.proyecto : (solicitud?.proyecto_nombre ?? null)
   const experienciaMin = parametros ? parametros.experiencia_min : (solicitud?.experiencia_min ?? null)
-  const criterios = (parametros?.criterios ?? solicitud?.criterios ?? []).map((c) => c.valor)
+  const criterios = parametros?.criterios ?? solicitud?.criterios ?? []
   const esAnterior = ejecuciones.some((e) => e.id === resultado.id && !e.es_mas_reciente)
   const masReciente = ejecuciones.find((e) => e.es_mas_reciente)
 
@@ -271,9 +272,8 @@ export default function Resultados() {
           <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 6px' }}>
             {[clienteNombre ?? 'Sin cliente', proyectoNombre].filter(Boolean).join(' · ')}
           </p>
-          <p style={{ fontSize: 11, color: 'var(--muted-2)', margin: 0 }}>
-            {[...criterios, experienciaMin ? `${experienciaMin}+ años` : ''].filter(Boolean).join(' · ')}
-          </p>
+          {/* HU-09 y HU-15: los criterios de ESTA ejecución, agrupados como en el formulario. */}
+          <CriteriosSolicitud criterios={criterios} experienciaMin={experienciaMin} />
           {resultado.total_ejecuciones > 1 && (
             <p style={{ fontSize: 11, color: 'var(--muted-2)', margin: '4px 0 0' }}>
               Ejecución {resultado.numero_ejecucion} de {resultado.total_ejecuciones}
