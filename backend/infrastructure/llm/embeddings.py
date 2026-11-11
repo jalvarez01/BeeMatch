@@ -85,7 +85,7 @@ class ProveedorEmbeddings:
                 timeout=TIMEOUT,
             )
         except httpx.HTTPError as exc:
-            raise EmbeddingsError(f"No fue posible contactar al proveedor de embeddings: {exc}")
+            raise EmbeddingsError(f"No fue posible contactar al proveedor de embeddings: {exc}") from exc
 
         if respuesta.status_code == 401:
             raise ProveedorEmbeddingsNoDisponibleError(

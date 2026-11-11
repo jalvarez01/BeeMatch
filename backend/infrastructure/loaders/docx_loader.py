@@ -9,7 +9,7 @@ def extraer_texto_docx(contenido: bytes) -> str:
     try:
         from docx import Document
     except ImportError as exc:  # pragma: no cover
-        raise DocumentoDanadoError(f"python-docx no disponible: {exc}")
+        raise DocumentoDanadoError(f"python-docx no disponible: {exc}") from exc
 
     try:
         documento = Document(io.BytesIO(contenido))
@@ -23,7 +23,7 @@ def extraer_texto_docx(contenido: bytes) -> str:
                     partes.append(" | ".join(celdas))
     except Exception as exc:
         # Zip truncado, XML roto, partes faltantes: para el coordinador es lo mismo.
-        raise DocumentoDanadoError(f"DOCX dañado o ilegible: {exc}")
+        raise DocumentoDanadoError(f"DOCX dañado o ilegible: {exc}") from exc
 
     texto = "\n".join(partes).strip()
     if not texto:

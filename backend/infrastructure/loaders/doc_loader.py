@@ -37,7 +37,7 @@ def extraer_texto_doc(contenido: bytes) -> str:
                 timeout=TIMEOUT_SEGUNDOS,
             )
         except subprocess.TimeoutExpired:
-            raise DocumentoDanadoError("El documento .doc tardó demasiado en leerse.")
+            raise DocumentoDanadoError("El documento .doc tardó demasiado en leerse.") from None
 
     if resultado.returncode != 0:
         detalle = resultado.stderr.decode("utf-8", errors="replace").strip()[:200]

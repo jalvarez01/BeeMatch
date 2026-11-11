@@ -53,3 +53,7 @@ extend-immutable-calls = [
 # Las pruebas importan `backend.infrastructure.persistence.models` solo para
 # registrar las tablas en el metadata: es un efecto de importación, no un uso.
 "tests/*" = ["F401"]
+
+# Los prompts son texto para el modelo: partirlos en líneas de 110 caracteres
+# cambiaría los espacios y saltos que el modelo recibe.
+"backend/infrastructure/llm/prompts.py" = ["E501"]

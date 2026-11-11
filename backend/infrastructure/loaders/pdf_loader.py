@@ -21,12 +21,12 @@ def extraer_texto_pdf(contenido: bytes) -> tuple[str, list[int]]:
     try:
         from pypdf import PdfReader
     except ImportError as exc:  # pragma: no cover
-        raise DocumentoDanadoError(f"pypdf no disponible: {exc}")
+        raise DocumentoDanadoError(f"pypdf no disponible: {exc}") from exc
 
     try:
         lector = PdfReader(io.BytesIO(contenido))
     except Exception as exc:
-        raise DocumentoDanadoError(f"PDF dañado o ilegible: {exc}")
+        raise DocumentoDanadoError(f"PDF dañado o ilegible: {exc}") from exc
 
     if lector.is_encrypted:
         # Muchos PDF están "cifrados" con clave de apertura vacía y solo
@@ -53,7 +53,7 @@ def extraer_texto_pdf(contenido: bytes) -> tuple[str, list[int]]:
                 bloques.append(texto)
                 paginas.append(numero)
     except Exception as exc:
-        raise DocumentoDanadoError(f"PDF dañado: no se pudieron recorrer sus páginas ({exc})")
+        raise DocumentoDanadoError(f"PDF dañado: no se pudieron recorrer sus páginas ({exc})") from exc
 
     if not bloques:
         texto_ocr = _ocr(contenido)

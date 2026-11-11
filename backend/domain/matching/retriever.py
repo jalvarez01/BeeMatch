@@ -131,7 +131,7 @@ class RecuperadorHibrido:
 
 
 def _coseno(a: list[float], b: list[float]) -> float:
-    producto = sum(x * y for x, y in zip(a, b))
+    producto = sum(x * y for x, y in zip(a, b, strict=False))
     norma_a = sum(x * x for x in a) ** 0.5
     norma_b = sum(y * y for y in b) ** 0.5
     return producto / (norma_a * norma_b) if norma_a and norma_b else 0.0

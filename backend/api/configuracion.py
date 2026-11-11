@@ -216,7 +216,10 @@ def guardar_repositorio(
             ACCION_REPOSITORIO_CONFIGURADO,
             usuario_id=current_user.id,
             entidad="configuracion_repositorio",
-            detalle=f"tipo={datos.tipo}, carpeta={datos.carpeta}, documentos={resultado.documentos_detectados}",
+            detalle=(
+                f"tipo={datos.tipo}, carpeta={datos.carpeta}, "
+                f"documentos={resultado.documentos_detectados}"
+            ),
         )
 
     return GuardarRepositorioResponse(
