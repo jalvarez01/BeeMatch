@@ -14,6 +14,7 @@ cryptography==50.0.1
 # Base de datos
 psycopg[binary]==3.2.3
 pgvector==0.3.5
+alembic==1.13.3
 
 # Cola de trabajos y planificación
 redis==5.1.1

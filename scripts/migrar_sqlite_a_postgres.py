@@ -19,8 +19,8 @@ Opciones:
     --simular      Lee y valida el origen, pero no escribe en el destino.
 
 Qué hace, en orden:
-  1. Crea en el destino la extensión vector, las tablas y los índices HNSW y GIN
-     (los mismos pasos que la API al arrancar).
+  1. Deja el destino con la extensión vector, las tablas, los índices HNSW y GIN
+     y la versión de Alembic (los mismos pasos que la API al arrancar).
   2. Copia cada tabla en lotes. Solo pasan las columnas que existen en ambos
      lados, así que una base SQLite antigua (sin columnas nuevas) también sirve.
   3. Trata las referencias rotas. SQLite no hace cumplir las llaves foráneas,
@@ -83,9 +83,9 @@ def migrar(origen: Path, destino: str, vaciar: bool = False, simular: bool = Fal
     from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
     from backend.infrastructure.persistence.database import (
         Base,
-        crear_indices_de_busqueda,
         engine,
     )
+    from backend.migraciones import actualizar_esquema
 
     if not origen.exists():
         raise SystemExit(f"No existe la base de origen: {origen}")
@@ -98,7 +98,7 @@ def migrar(origen: Path, destino: str, vaciar: bool = False, simular: bool = Fal
     if not simular:
         with engine.begin() as conexion:
             conexion.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        Base.metadata.create_all(bind=engine)
+        actualizar_esquema()  # tablas, índices y versión de Alembic
 
         with engine.connect() as conexion:
             ocupadas = [
@@ -173,8 +173,6 @@ def migrar(origen: Path, destino: str, vaciar: bool = False, simular: bool = Fal
 
     if simular:
         return copiadas
-
-    crear_indices_de_busqueda()
 
     # Verificación: mismo número de filas en cada tabla.
     diferencias = []

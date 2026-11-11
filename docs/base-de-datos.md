@@ -9,22 +9,45 @@ BeeMatch usa dos motores según el entorno:
 
 El código decide en `backend/config.py` (`USA_PGVECTOR`). En SQLite el vector se guarda como JSON y la búsqueda es un cálculo en memoria; en PostgreSQL es una columna `vector(1536)` con índice.
 
-## Qué crea la API al arrancar en PostgreSQL
+## Esquema y migraciones (Alembic)
 
-`init_db()` ejecuta, en orden y de forma idempotente:
+En **PostgreSQL** el esquema lo gobiernan las migraciones de `backend/migrations/versions/`; en **SQLite** (desarrollo y pruebas) siguen siendo `create_all` y los `ALTER TABLE` de `_COLUMNAS_NUEVAS`, como siempre. Al arrancar, `init_db()` ejecuta en PostgreSQL:
 
 1. `CREATE EXTENSION IF NOT EXISTS vector`
-2. Las tablas (`create_all`) y las columnas añadidas después (`_COLUMNAS_NUEVAS`)
-3. Los índices de la recuperación híbrida:
+2. `actualizar_esquema()`, que según el estado de la base:
+   - **vacía:** aplica todas las migraciones;
+   - **creada antes de Alembic** (tiene tablas, no tiene `alembic_version`): completa las columnas que le falten, la marca en la versión `0001` y aplica las posteriores, sin tocar sus datos;
+   - **ya migrada:** aplica solo las que falten.
 
-| Índice | Definición | Lo usa |
-|---|---|---|
-| `ix_fragmentos_cv_embedding_hnsw` | `HNSW (embedding vector_cosine_ops)` | `embedding <=> :vec` (distancia coseno) en `RecuperadorHibrido._buscar_vectorial` |
-| `ix_fragmentos_cv_texto_fts` | `GIN (to_tsvector('spanish', texto))` | `to_tsvector('spanish', texto) @@ plainto_tsquery(...)` en `_buscar_lexico` |
+| Versión | Qué hace |
+|---|---|
+| `0001` | Esquema inicial: las 18 tablas (generado a partir de los modelos) |
+| `0002` | Índices HNSW (coseno) y GIN (`tsvector` en español), con `IF NOT EXISTS` |
 
-La expresión del índice GIN debe ser idéntica a la de la consulta; si se cambia una, hay que cambiar la otra. La prueba `test_la_busqueda_lexica_usa_el_indice_gin` lo vigila.
+| Índice | Lo usa |
+|---|---|
+| `ix_fragmentos_cv_embedding_hnsw` | `embedding <=> :vec` (distancia coseno) en `RecuperadorHibrido._buscar_vectorial` |
+| `ix_fragmentos_cv_texto_fts` | `to_tsvector('spanish', texto) @@ plainto_tsquery(...)` en `_buscar_lexico` |
 
-Los parámetros de HNSW son los de pgvector (`m=16`, `ef_construction=64`). Para el volumen previsto (cientos de hojas de vida, unos miles de fragmentos) no hace falta afinarlos.
+La expresión del GIN debe ser idéntica a la de la consulta léxica; si se cambia una, hay que cambiar la otra. Parámetros de HNSW: los de pgvector (`m=16`, `ef_construction=64`), suficientes para unos miles de fragmentos.
+
+### Cambiar un modelo (qué debe hacer quien programa)
+
+Si cambias un modelo (una columna, una tabla, un índice) hay que escribir su migración, o PostgreSQL no se enterará:
+
+```bash
+export DATABASE_URL=postgresql+psycopg://beematch:beematch@localhost:5432/beematch
+python -m backend.migraciones actualizar          # deja tu base local al día
+# ...cambias el modelo...
+python -m backend.migraciones crear "agrega columna x a solicitudes"   # genera backend/migrations/versions/NNNN_*.py
+# revisa el archivo generado, y:
+python -m backend.migraciones actualizar
+python -m backend.migraciones estado               # debe decir "Cambios sin migrar: ninguno"
+```
+
+Si se olvida, la prueba `test_las_migraciones_coinciden_con_los_modelos` falla en el CI (job de PostgreSQL) y dice qué falta. En SQLite no hace falta: sigue siendo `create_all`, pero **una columna nueva en un modelo también debe agregarse a `_COLUMNAS_NUEVAS`** si ya existen bases SQLite con datos.
+
+Para volver atrás no hay un comando propio: usa un respaldo (`scripts/aws/respaldar.sh`) antes de migrar en producción. `desplegar.sh` ya lo hace. Los `downgrade` de las migraciones existen y están probados, pero un cambio destructivo no se deshace con ellos.
 
 ## Cómo levantar PostgreSQL en local
 
@@ -79,5 +102,5 @@ Diferencias de comportamiento que SQLite ocultaba y que PostgreSQL destapó al c
 
 ## Pendiente
 
-- Migraciones versionadas (Alembic). Hoy los cambios de esquema que agregan columnas se aplican con `_COLUMNAS_NUEVAS`; un cambio de tipo o de índice no se aplica solo sobre una base existente.
-- Confirmar que el PostgreSQL administrado del hosting permite `CREATE EXTENSION vector` (RDS lo permite).
+- Confirmar que el PostgreSQL administrado del hosting permite `CREATE EXTENSION vector` (RDS lo permite). En el despliegue de AWS con Compose no aplica: la imagen `pgvector/pgvector` ya lo trae.
+- La dimensión de los embeddings (1536) está fija en la migración `0001`. Cambiar de modelo de embeddings a otra dimensión exige una migración nueva y reindexar.

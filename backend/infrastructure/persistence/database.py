@@ -21,11 +21,16 @@ def init_db():
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
 
-    Base.metadata.create_all(bind=engine)
-    _agregar_columnas_faltantes()
-    _rellenar_nombres_normalizados()
     if USA_PGVECTOR:
-        crear_indices_de_busqueda()
+        # PostgreSQL: el esquema lo gobiernan las migraciones (backend/migrations).
+        from backend.migraciones import actualizar_esquema
+
+        actualizar_esquema()
+    else:
+        # SQLite (desarrollo y pruebas): tablas desde los modelos y ALTER de las columnas nuevas.
+        Base.metadata.create_all(bind=engine)
+        _agregar_columnas_faltantes()
+    _rellenar_nombres_normalizados()
 
 
 # Índices de la recuperación híbrida (C20 y C21). `create_all` no los crea:
