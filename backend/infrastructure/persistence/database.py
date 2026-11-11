@@ -24,6 +24,37 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _agregar_columnas_faltantes()
     _rellenar_nombres_normalizados()
+    if USA_PGVECTOR:
+        crear_indices_de_busqueda()
+
+
+# Índices de la recuperación híbrida (C20 y C21). `create_all` no los crea:
+# dependen de operadores propios de PostgreSQL y pgvector.
+#
+# - HNSW con distancia coseno: es el operador `<=>` que usa el recuperador.
+#   Parámetros por defecto de pgvector (m=16, ef_construction=64): para unos
+#   miles de fragmentos no hace falta afinarlos.
+# - GIN sobre to_tsvector('spanish', texto): la expresión debe ser idéntica a
+#   la de la consulta léxica, o el planificador no usa el índice.
+INDICES_DE_BUSQUEDA = {
+    "ix_fragmentos_cv_embedding_hnsw": (
+        "CREATE INDEX IF NOT EXISTS ix_fragmentos_cv_embedding_hnsw "
+        "ON fragmentos_cv USING hnsw (embedding vector_cosine_ops)"
+    ),
+    "ix_fragmentos_cv_texto_fts": (
+        "CREATE INDEX IF NOT EXISTS ix_fragmentos_cv_texto_fts "
+        "ON fragmentos_cv USING gin (to_tsvector('spanish', texto))"
+    ),
+}
+
+
+def crear_indices_de_busqueda():
+    """Crea los índices vectorial y léxico si faltan. Es idempotente."""
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        for sentencia in INDICES_DE_BUSQUEDA.values():
+            conn.execute(text(sentencia))
 
 
 # Columnas añadidas después de crear las tablas. `create_all` no altera tablas

@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from backend.config import EMBEDDING_DIMENSIONES
 from backend.domain.services import indexacion_service
 from backend.domain.services.indexacion_service import IndexacionService
 from backend.infrastructure.llm.llm_provider import RespuestaIA
@@ -35,7 +36,7 @@ class RepositorioFalso:
 
 class EmbeddingsFalso:
     def generar(self, textos):
-        return [[0.1, 0.2, 0.3] for _ in textos]
+        return [[0.1] * EMBEDDING_DIMENSIONES for _ in textos]
 
 
 class LLMFalso:
