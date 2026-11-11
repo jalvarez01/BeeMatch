@@ -9,11 +9,21 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beematch -d beematch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   api:
     build:
@@ -22,27 +32,35 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://beematch:beematch@db:5432/beematch
       REDIS_URL: redis://redis:6379/0
+      # El planificador corre en el worker (un solo proceso), no en cada API.
+      PLANIFICADOR_EN_API: "false"
     env_file:
       - .env
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   worker:
     build:
       context: .
       dockerfile: backend/dockerfile
-    command: rq worker beematch --url redis://redis:6379/0
+    # SimpleWorker (sin fork), el mismo que se usa en macOS; ver run_worker.py.
+    # --planificador: este es el único proceso que sincroniza el repositorio.
+    command: python -m backend.workers.run_worker --planificador
     environment:
       DATABASE_URL: postgresql+psycopg://beematch:beematch@db:5432/beematch
       REDIS_URL: redis://redis:6379/0
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:

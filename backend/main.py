@@ -14,7 +14,7 @@ from backend.api import (
     preseleccion,
     solicitudes,
 )
-from backend.config import ALLOWED_ORIGINS
+from backend.config import ALLOWED_ORIGINS, PLANIFICADOR_EN_API
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import init_db
 
@@ -53,8 +53,9 @@ def on_startup():
     _sembrar_repositorio()
 
     # El planificador solo arranca si APScheduler está instalado y hay un
-    # origen de hojas de vida configurado, sea cual sea el proveedor.
-    if _hay_origen_configurado():
+    # origen de hojas de vida configurado, sea cual sea el proveedor. Con varias
+    # instancias de la API se apaga aquí y corre en el worker (PLANIFICADOR_EN_API).
+    if PLANIFICADOR_EN_API and _hay_origen_configurado():
         from backend.workers.scheduler import iniciar_planificador
 
         iniciar_planificador()

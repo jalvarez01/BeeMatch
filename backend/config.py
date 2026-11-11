@@ -34,6 +34,13 @@ ONEDRIVE_DRIVE_ID = os.getenv("ONEDRIVE_DRIVE_ID", "")
 ONEDRIVE_CARPETA_CV = os.getenv("ONEDRIVE_CARPETA_CV", "/HojasDeVida")
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 SYNC_INTERVALO_HORAS = int(os.getenv("SYNC_INTERVALO_HORAS", "6"))
+# Dónde corre el planificador (C18). Con una sola API en desarrollo, dentro de
+# ella. Con varias instancias hay que apagarlo en la API (PLANIFICADOR_EN_API=false)
+# y arrancarlo en UN worker (`run_worker --planificador`); si no, cada instancia
+# sincronizaría el repositorio por su cuenta.
+PLANIFICADOR_EN_API = os.getenv("PLANIFICADOR_EN_API", "true").lower() in ("1", "true", "si", "sí")
+# Cuánto se recuerda el embedding de una consulta ya vista (C22, caché en Redis).
+EMBEDDING_CACHE_TTL_HORAS = int(os.getenv("EMBEDDING_CACHE_TTL_HORAS", "168"))
 
 # Semilla de Google Drive: archivo de la cuenta de servicio en la raíz del
 # proyecto y carpeta de hojas de vida compartida con esa cuenta. Sirve para que
