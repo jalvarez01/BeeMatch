@@ -213,6 +213,12 @@ def main() -> None:
     for nombre, cantidad in copiadas.items():
         if cantidad:
             print(f"  {nombre}: {cantidad}")
+    if copiadas.get("configuracion_repositorio"):
+        print(
+            "AVISO: las credenciales del repositorio de hojas de vida van cifradas con la clave del\n"
+            "  entorno de origen (ENCRYPTION_KEY o JWT_SECRET). Si el destino usa otra, no se podrán\n"
+            "  descifrar: vuelve a registrarlas desde Configuración."
+        )
     if ajustes:
         print("Referencias rotas en el origen (SQLite no las valida):")
         for motivo, cantidad in ajustes.items():

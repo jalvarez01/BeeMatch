@@ -52,6 +52,7 @@ python -m scripts.migrar_sqlite_a_postgres --destino "$DATABASE_URL"
 - **Es una sola transacción**: si algo falla, el destino queda como estaba.
 - **Referencias rotas.** SQLite no valida llaves foráneas y PostgreSQL sí. Si el origen tiene filas que apuntan a algo que ya no existe (por ejemplo, coincidencias que citan un fragmento borrado al reindexar), la referencia se deja en `NULL` si la columna lo permite, o la fila se descarta si no. El script lo informa.
 - Al final compara el número de filas por tabla y falla si no coinciden.
+- **Credenciales del repositorio.** El secreto de OneDrive o Drive se guarda cifrado con `ENCRYPTION_KEY` (o con una clave derivada de `JWT_SECRET` si esa no existe). Si el servidor de destino usa otra clave, esa credencial no se podrá descifrar y hay que volver a registrarla desde Configuración. El script lo avisa.
 
 Resultado con la base de desarrollo del equipo (31 hojas de vida, 140 fragmentos): 1.179 filas copiadas, 14 referencias de `coincidencias.fragmento_id` puestas en `NULL`, verificación correcta.
 
