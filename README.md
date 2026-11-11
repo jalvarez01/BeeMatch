@@ -123,6 +123,11 @@ estos tres modos está usando: Redis con worker, Redis sin worker (los trabajos 
 
 Para apagar Redis: `docker compose stop redis`.
 
+Con `docker compose up` (API y worker en contenedores) el worker se arranca con
+`python -m backend.workers.run_worker --planificador` y la API con `PLANIFICADOR_EN_API=false`: la
+sincronización periódica del repositorio corre en un solo proceso. Detalle, pruebas y qué pasa
+cuando Redis o el worker se caen en [`docs/redis-y-worker.md`](docs/redis-y-worker.md).
+
 **Frontend**
 
 ```bash

@@ -69,14 +69,38 @@ def sincronizar_y_encolar() -> dict:
         db.close()
 
 
+def sincronizacion_programada() -> None:
+    """
+    Tarea del planificador. Sin repositorio configurado no hay nada que
+    sincronizar: es un estado normal (el administrador aún no lo conecta), no un
+    error que deba llenar el log cada SYNC_INTERVALO_HORAS.
+    """
+    from backend.domain.services.repositorio_config_service import RepositorioNoConfiguradoError
+
+    try:
+        sincronizar_y_encolar()
+    except RepositorioNoConfiguradoError:
+        logger.info("Sincronización programada omitida: no hay repositorio configurado.")
+
+
 def iniciar_planificador():
-    """Arranca APScheduler en background. Se llama desde el startup de FastAPI."""
+    """
+    Arranca APScheduler en background. Lo llama el startup de la API (desarrollo
+    con una sola instancia) o el worker con `--planificador` (despliegue).
+    """
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
     except ImportError:
         return None
 
     planificador = BackgroundScheduler()
-    planificador.add_job(sincronizar_y_encolar, "interval", hours=SYNC_INTERVALO_HORAS)
+    planificador.add_job(
+        sincronizacion_programada,
+        "interval",
+        hours=SYNC_INTERVALO_HORAS,
+        id="sincronizacion-repositorio",
+        max_instances=1,
+        coalesce=True,
+    )
     planificador.start()
     return planificador
