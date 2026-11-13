@@ -5,6 +5,7 @@ Ejecuta las tres etapas y persiste el Top-N con su desglose explicable.
 Lo invoca el worker de búsqueda, nunca la petición HTTP directamente (RNF04).
 """
 
+import logging
 import time
 from datetime import timedelta
 from typing import Optional
@@ -58,6 +59,8 @@ from backend.infrastructure.persistence.repositories.cliente_repo import (
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
 from backend.schemas.busqueda import ParametrosBusqueda
+
+logger = logging.getLogger(__name__)
 
 # Una búsqueda pendiente o ejecutándose más tiempo que esto se da por abandonada.
 # Supera el job_timeout de la cola (900 s), así que ningún trabajo vivo la alcanza.
@@ -218,6 +221,10 @@ class BusquedaService:
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
         except Exception as exc:  # noqa: BLE001
+            # Al usuario se le da un mensaje genérico; el detalle técnico va al log con su
+            # traza (antes solo iba a la bitácora, y esta fallaba en silencio si el error
+            # venía de la base de datos).
+            logger.exception("Error inesperado en la búsqueda %s", busqueda_id)
             self._registrar_error(solicitud, "ERROR_INESPERADO", str(exc))
             self.busquedas.finalizar(
                 busqueda_id,
@@ -309,16 +316,21 @@ class BusquedaService:
 
     def _registrar_error(self, solicitud, tipo_error: str, detalle: str) -> None:
         """Registra en la bitácora los errores que impiden completar una búsqueda."""
-        try:
-            BitacoraService(self.db).registrar(
-                accion=ACCION_ERROR_SERVICIO,
-                usuario_id=solicitud.usuario_id,
-                entidad="solicitud",
-                entidad_id=solicitud.id,
-                detalle=f"tipo={tipo_error}; detalle={detalle}",
-            )
-        except Exception:
-            self.db.rollback()
+        # Si el error vino de la base de datos, la transacción quedó rota y no admite
+        # más escrituras hasta un rollback: el primer intento falla y el segundo, ya
+        # con la sesión limpia, sí queda. Antes se perdía el registro en silencio.
+        for _intento in range(2):
+            try:
+                BitacoraService(self.db).registrar(
+                    accion=ACCION_ERROR_SERVICIO,
+                    usuario_id=solicitud.usuario_id,
+                    entidad="solicitud",
+                    entidad_id=solicitud.id,
+                    detalle=f"tipo={tipo_error}; detalle={detalle}",
+                )
+                return
+            except Exception:
+                self.db.rollback()
 
     def marcar_error_repositorio(
         self,
