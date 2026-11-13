@@ -1,16 +1,13 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.domain.services.bitacora_service import (
-    ACCION_BUSQUEDA_EJECUTADA,
-    ACCION_PRESELECCION,
-    BitacoraService,
-)
+from backend.domain.services.bitacora_service import ACCION_PRESELECCION, BitacoraService
 from backend.domain.services.busqueda_service import BusquedaService
 from backend.domain.services.resultado_service import ResultadoService
 from backend.domain.services.solicitud_service import (
     MENSAJE_DESCRIPCION_CORTA,
-    campos_faltantes,
+    SolicitudService,
+    campos_faltantes_busqueda,
     descripcion_insuficiente,
     mensaje_campos_faltantes,
 )
@@ -20,10 +17,12 @@ from backend.infrastructure.persistence.repositories.solicitud_repo import Solic
 from backend.schemas.busqueda import (
     BusquedaEstadoResponse,
     BusquedaResultadoResponse,
+    EjecucionResumen,
     PreseleccionToggle,
     RecomendacionResponse,
 )
 from backend.schemas.hoja_vida import DisponibilidadHojaVidaResponse
+from backend.schemas.solicitud import AjusteSolicitud
 from backend.security import get_current_user, puede_ver_solicitud
 from backend.workers.busqueda_worker import ejecutar_busqueda
 from backend.workers.queue import despachar
@@ -53,6 +52,38 @@ def _exigir_acceso_a_recomendacion(db: Session, recomendacion_id: str, usuario) 
         _exigir_acceso_a_busqueda(db, recomendacion.busqueda_id, usuario)
 
 
+def _obtener_solicitud_accesible(db: Session, solicitud_id: str, usuario):
+    solicitud = SolicitudRepository(db).get_by_id(solicitud_id)
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if not puede_ver_solicitud(usuario, solicitud):
+        raise HTTPException(
+            status_code=403, detail="No tienes permiso para acceder a esta solicitud."
+        )
+    return solicitud
+
+
+def _exigir_solicitud_completa(descripcion, rol, cliente) -> None:
+    """HU-10 y HU-12: sin rol, descripción o cliente la búsqueda no se ejecuta."""
+    faltantes = campos_faltantes_busqueda(descripcion, rol, cliente)
+    if faltantes:
+        raise HTTPException(status_code=422, detail=mensaje_campos_faltantes(faltantes))
+    if descripcion_insuficiente(descripcion):
+        raise HTTPException(status_code=422, detail=MENSAJE_DESCRIPCION_CORTA)
+
+
+def _lanzar_busqueda(db: Session, tareas: BackgroundTasks, solicitud_id: str, usuario) -> str:
+    """Crea la ejecución con la copia de los criterios actuales y la despacha al worker."""
+    servicio = BusquedaService(db)
+    # La bitácora de HU-06 la registra `encolar`, que es donde se crea la búsqueda.
+    busqueda_id = servicio.encolar(solicitud_id, usuario_id=usuario.id)
+    SolicitudRepository(db).cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
+    # La sincronización con el repositorio (HU-16) la hace el worker, no esta
+    # petición: ver backend/workers/busqueda_worker.py.
+    despachar(tareas, ejecutar_busqueda, busqueda_id)
+    return busqueda_id
+
+
 @router.post("/solicitud/{solicitud_id}", response_model=BusquedaEstadoResponse, status_code=202)
 def ejecutar(
     solicitud_id: str,
@@ -64,19 +95,11 @@ def ejecutar(
     HU-18. Responde 202 de inmediato: el análisis corre en un worker y el
     frontend consulta el progreso (RNF04, HU-22).
     """
-    solicitudes = SolicitudRepository(db)
-    solicitud = solicitudes.get_by_id(solicitud_id)
-    if not solicitud:
-        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
-    if not puede_ver_solicitud(current_user, solicitud):
-        raise HTTPException(
-            status_code=403, detail="No tienes permiso para acceder a esta solicitud."
-        )
-    faltantes = campos_faltantes(solicitud.descripcion_libre, solicitud.rol_buscado)
-    if faltantes:
-        raise HTTPException(status_code=422, detail=mensaje_campos_faltantes(faltantes))
-    if descripcion_insuficiente(solicitud.descripcion_libre):
-        raise HTTPException(status_code=422, detail=MENSAJE_DESCRIPCION_CORTA)
+    solicitud = _obtener_solicitud_accesible(db, solicitud_id, current_user)
+    cliente = SolicitudService(db).clientes.get_by_id(solicitud.cliente_id) if solicitud.cliente_id else None
+    _exigir_solicitud_completa(
+        solicitud.descripcion_libre, solicitud.rol_buscado, cliente.nombre if cliente else None
+    )
 
     servicio = BusquedaService(db)
 
@@ -86,21 +109,50 @@ def ejecutar(
     if en_curso:
         return BusquedaEstadoResponse.model_validate(en_curso)
 
-    busqueda_id = servicio.encolar(solicitud_id)
-    solicitudes.cambiar_estado(solicitud_id, ESTADO_EN_ANALISIS)
-    # La sincronización con el repositorio (HU-16) la hace el worker, no esta
-    # petición: ver backend/workers/busqueda_worker.py.
-    despachar(tareas, ejecutar_busqueda, busqueda_id)
+    busqueda_id = _lanzar_busqueda(db, tareas, solicitud_id, current_user)
+    return BusquedaEstadoResponse.model_validate(servicio.busquedas.get_by_id(busqueda_id))
 
-    BitacoraService(db).registrar(
-        ACCION_BUSQUEDA_EJECUTADA,
-        usuario_id=current_user.id,
-        entidad="busqueda",
-        entidad_id=busqueda_id,
-    )
 
-    busqueda = servicio.busquedas.get_by_id(busqueda_id)
-    return BusquedaEstadoResponse.model_validate(busqueda)
+@router.post(
+    "/solicitud/{solicitud_id}/reejecutar", response_model=BusquedaEstadoResponse, status_code=202
+)
+def reejecutar(
+    solicitud_id: str,
+    datos: AjusteSolicitud,
+    tareas: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    HU-15: ajusta los criterios de la solicitud y vuelve a ejecutar el análisis.
+
+    Es una sola operación: si los criterios no son válidos (por ejemplo, falta el
+    cliente) o ya hay un análisis en curso, no se cambia nada. La ejecución nueva
+    se suma a las anteriores, que conservan sus criterios y resultados.
+    """
+    _obtener_solicitud_accesible(db, solicitud_id, current_user)
+    _exigir_solicitud_completa(datos.descripcion_libre, datos.rol_buscado, datos.cliente)
+
+    servicio = BusquedaService(db)
+    if servicio.en_curso(solicitud_id):
+        # HU-22: un segundo envío (doble clic, otra pestaña) no pisa el análisis en marcha.
+        raise HTTPException(
+            status_code=409,
+            detail="Esta solicitud ya se está analizando. Espera a que termine para ajustar los criterios.",
+        )
+
+    SolicitudService(db).reemplazar(solicitud_id, datos)
+    busqueda_id = _lanzar_busqueda(db, tareas, solicitud_id, current_user)
+    return BusquedaEstadoResponse.model_validate(servicio.busquedas.get_by_id(busqueda_id))
+
+
+@router.get("/solicitud/{solicitud_id}/ejecuciones", response_model=list[EjecucionResumen])
+def ejecuciones(
+    solicitud_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)
+):
+    """HU-15: historial de ejecuciones de la solicitud, de la más reciente a la más antigua."""
+    _obtener_solicitud_accesible(db, solicitud_id, current_user)
+    return ResultadoService(db).ejecuciones(solicitud_id)
 
 
 @router.get("/{busqueda_id}/estado", response_model=BusquedaEstadoResponse)

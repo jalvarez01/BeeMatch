@@ -18,6 +18,7 @@ const TITULOS: Record<string, string> = {
   '/candidato': 'Candidato',
   '/configuracion': 'Configuración',
   '/usuarios': 'Usuarios',
+  '/bitacora': 'Bitácora',
 }
 
 const RUTAS_POR_ROL: Record<Rol, string[]> = {
@@ -30,6 +31,7 @@ const RUTAS_POR_ROL: Record<Rol, string[]> = {
     '/nueva-busqueda',
     '/solicitudes',
     '/usuarios',
+    '/bitacora',
     '/candidatos',
     '/historial',
     '/resultados',
@@ -41,6 +43,7 @@ const RUTAS_POR_ROL: Record<Rol, string[]> = {
     '/nueva-busqueda',
     '/solicitudes',
     '/usuarios',
+    '/bitacora',
     '/candidatos',
     '/historial',
     '/resultados',

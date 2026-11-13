@@ -24,5 +24,6 @@ def nivel_de(puntaje: float) -> str:
     return NIVEL_BAJA
 
 
-def supera_umbral(puntaje: float) -> bool:
-    return puntaje >= UMBRAL_AFINIDAD_MINIMA
+def supera_umbral(puntaje: float, umbral: float = UMBRAL_AFINIDAD_MINIMA) -> bool:
+    """`umbral` llega de los parámetros que ajusta el administrador (HU-07)."""
+    return puntaje >= umbral

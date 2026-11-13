@@ -21,6 +21,8 @@ export type TipoCriterio =
   | 'DOMINIO'
   | 'CERTIFICACION'
   | 'IDIOMA'
+  /** HU-09: el campo "Otros conocimientos" (sector, metodologías, normas…). */
+  | 'OTRO'
 
 export interface Usuario {
   id: string
@@ -52,13 +54,24 @@ export interface Solicitud {
   experiencia_min: number | null
   estado: EstadoSolicitud
   created_at: string | null
+  cliente_id: string | null
+  proyecto_id: string | null
   cliente_nombre: string | null
   proyecto_nombre: string | null
   usuario_nombre: string | null
   criterios: Criterio[]
   total_candidatos: number | null
   mejor_afinidad: number | null
+  total_preseleccionados: number | null
   busqueda_id: string | null
+  /** HU-15: cuántas veces se ejecutó el análisis de la solicitud. */
+  total_ejecuciones: number
+}
+
+/** HU-12: cliente ya registrado, para las sugerencias y el filtro del historial. */
+export interface ClienteSugerido {
+  id: string
+  nombre: string
 }
 
 export interface Historial {
@@ -73,6 +86,16 @@ export interface SolicitudPayload {
   experiencia_min?: number | null
   cliente?: string | null
   proyecto?: string | null
+  criterios: Criterio[]
+}
+
+/** HU-15: ajuste completo de la solicitud; lo que no se envía se borra. */
+export interface AjustePayload {
+  descripcion_libre: string
+  rol_buscado: string | null
+  experiencia_min: number | null
+  cliente: string | null
+  proyecto: string | null
   criterios: Criterio[]
 }
 
@@ -132,6 +155,31 @@ export interface BusquedaEstado {
   mensaje_error: string | null
 }
 
+/** HU-12 y HU-15: lo que se analizó en una ejecución. */
+export interface ParametrosBusqueda {
+  descripcion_libre: string
+  rol_buscado: string | null
+  experiencia_min: number | null
+  cliente_id: string | null
+  cliente: string | null
+  proyecto_id: string | null
+  proyecto: string | null
+  criterios: Criterio[]
+}
+
+/** HU-15: una fila del historial de ejecuciones de una solicitud. */
+export interface EjecucionResumen {
+  id: string
+  numero: number
+  estado: EstadoBusqueda
+  created_at: string | null
+  es_mas_reciente: boolean
+  total_candidatos: number
+  mejor_afinidad: number | null
+  mensaje_error: string | null
+  parametros: ParametrosBusqueda | null
+}
+
 export interface BusquedaResultado {
   id: string
   solicitud_id: string
@@ -141,6 +189,10 @@ export interface BusquedaResultado {
   duracion_ms: number | null
   modelo_ia: string | null
   created_at: string | null
+  /** Nulo en las ejecuciones anteriores a HU-15. */
+  parametros: ParametrosBusqueda | null
+  numero_ejecucion: number
+  total_ejecuciones: number
   recomendaciones: Recomendacion[]
 }
 

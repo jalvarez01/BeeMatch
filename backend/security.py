@@ -144,9 +144,9 @@ def decodificar_token(token: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="La sesión expiró. Inicia sesión nuevamente.",
-        )
+        ) from None
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido.") from None
 
 
 # --- Dependencias ------------------------------------------------------------

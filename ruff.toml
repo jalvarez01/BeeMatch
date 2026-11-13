@@ -12,7 +12,8 @@ line-length = 110
 target-version = "py312"
 
 # Los .pyc versionados de arrastre y el entorno virtual no son código nuestro.
-extend-exclude = [".venv", "**/__pycache__", "frontend"]
+# Las migraciones de Alembic son código generado y congelado: se editan lo mínimo.
+extend-exclude = [".venv", "**/__pycache__", "frontend", "backend/migrations/versions"]
 
 [lint]
 select = [
@@ -53,3 +54,7 @@ extend-immutable-calls = [
 # Las pruebas importan `backend.infrastructure.persistence.models` solo para
 # registrar las tablas en el metadata: es un efecto de importación, no un uso.
 "tests/*" = ["F401"]
+
+# Los prompts son texto para el modelo: partirlos en líneas de 110 caracteres
+# cambiaría los espacios y saltos que el modelo recibe.
+"backend/infrastructure/llm/prompts.py" = ["E501"]

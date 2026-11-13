@@ -169,7 +169,7 @@ def test_los_cinco_llegan_ordenados_de_mayor_a_menor_afinidad(db):
     solicitud_id = _crear_solicitud(db)
     # A propósito desordenados: el del medio es el mejor.
     valores = [72.0, 88.0, 99.0, 65.0, 94.0, 80.0]
-    puntajes = dict(zip(ids, valores))
+    puntajes = dict(zip(ids, valores, strict=False))
 
     servicio = _servicio(db, puntajes, ids)
     busqueda_id = servicio.encolar(solicitud_id)
@@ -185,7 +185,7 @@ def test_los_cinco_llegan_ordenados_de_mayor_a_menor_afinidad(db):
 def test_la_posicion_guardada_refleja_el_orden(db):
     ids = _crear_candidatos(db, 3)
     solicitud_id = _crear_solicitud(db)
-    puntajes = dict(zip(ids, [70.0, 90.0, 80.0]))
+    puntajes = dict(zip(ids, [70.0, 90.0, 80.0], strict=False))
 
     servicio = _servicio(db, puntajes, ids)
     busqueda_id = servicio.encolar(solicitud_id)
@@ -205,7 +205,7 @@ def test_solo_se_muestran_los_que_superan_el_umbral(db):
     # Tres por encima del umbral y tres por debajo.
     bajo = UMBRAL_AFINIDAD_MINIMA - 10
     valores = [92.0, 85.0, 77.0, bajo, bajo - 5, bajo - 15]
-    puntajes = dict(zip(ids, valores))
+    puntajes = dict(zip(ids, valores, strict=False))
 
     servicio = _servicio(db, puntajes, ids)
     busqueda_id = servicio.encolar(solicitud_id)
@@ -242,7 +242,7 @@ def test_cada_resultado_llega_con_los_cuatro_datos_de_la_tarjeta(db):
             cid, [{"nombre": "Java"}, {"nombre": "Spring Boot", "categoria": "FRAMEWORK"}]
         )
     solicitud_id = _crear_solicitud(db)
-    puntajes = dict(zip(ids, [91.0, 84.0]))
+    puntajes = dict(zip(ids, [91.0, 84.0], strict=False))
 
     servicio = _servicio(db, puntajes, ids)
     busqueda_id = servicio.encolar(solicitud_id)

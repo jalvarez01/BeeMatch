@@ -58,7 +58,8 @@ class SincronizacionService:
                 }
             )
 
-            if documento.formato == "NO_SOPORTADO": # Registrar como no procesados archivos con formato no soportado.
+            # Registrar como no procesados los archivos con formato no soportado.
+            if documento.formato == "NO_SOPORTADO":
                 self.repo.marcar_no_procesable(
                     hoja.id,
                     f"Formato no soportado: {documento.nombre_archivo}",

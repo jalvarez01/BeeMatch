@@ -71,7 +71,7 @@ def _extraer_ole(contenido: bytes) -> str:
     try:
         ole = olefile.OleFileIO(io.BytesIO(contenido))
     except Exception as exc:
-        raise DocumentoDanadoError(f"Documento de Word dañado o ilegible: {exc}")
+        raise DocumentoDanadoError(f"Documento de Word dañado o ilegible: {exc}") from exc
 
     try:
         if ole.exists("EncryptedPackage") or ole.exists("EncryptionInfo"):
@@ -88,7 +88,7 @@ def _extraer_ole(contenido: bytes) -> str:
     except (DocumentoProtegidoError, DocumentoDanadoError):
         raise
     except Exception as exc:
-        raise DocumentoDanadoError(f"Documento de Word dañado o ilegible: {exc}")
+        raise DocumentoDanadoError(f"Documento de Word dañado o ilegible: {exc}") from exc
     finally:
         ole.close()
 

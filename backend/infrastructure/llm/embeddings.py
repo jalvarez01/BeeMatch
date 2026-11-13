@@ -18,6 +18,7 @@ from backend.config import (
     EMBEDDING_URL,
     USA_PGVECTOR,
 )
+from backend.infrastructure import cache
 
 TIMEOUT = 60
 
@@ -66,7 +67,17 @@ class ProveedorEmbeddings:
         return vectores
 
     def generar_uno(self, texto: str) -> list[float]:
-        return self.generar([texto])[0]
+        """
+        Embedding de una consulta. Se recuerda en Redis (C22): ajustar o
+        re-ejecutar una solicitud repite el mismo texto y no hay por qué pagarlo
+        dos veces. Sin Redis simplemente se pide al proveedor.
+        """
+        guardado = cache.obtener_embedding(self.modelo, self.dimensiones, texto)
+        if guardado:
+            return guardado
+        vector = self.generar([texto])[0]
+        cache.guardar_embedding(self.modelo, self.dimensiones, texto, vector)
+        return vector
 
     # --- Interno -------------------------------------------------------------
 
@@ -85,7 +96,7 @@ class ProveedorEmbeddings:
                 timeout=TIMEOUT,
             )
         except httpx.HTTPError as exc:
-            raise EmbeddingsError(f"No fue posible contactar al proveedor de embeddings: {exc}")
+            raise EmbeddingsError(f"No fue posible contactar al proveedor de embeddings: {exc}") from exc
 
         if respuesta.status_code == 401:
             raise ProveedorEmbeddingsNoDisponibleError(

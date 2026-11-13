@@ -1,0 +1,131 @@
+# Despliegue en un servidor (AWS EC2). Para desarrollo local usa docker-compose.yml.
+#
+#   cp .env.production.example .env.production   # y completar los valores
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Diferencias con el de desarrollo:
+#   - Solo el puerto 80/443 (web) está publicado; base de datos, Redis y API
+#     quedan en la red interna.
+#   - Los datos viven en volúmenes con nombre y Redis persiste su cola (AOF).
+#   - El frontend se compila y lo sirve Caddy, que también hace de proxy de la API.
+#   - Todo se reinicia solo si el servidor se reinicia.
+
+# Nombre propio: no se mezcla con el compose de desarrollo (proyecto "beematch")
+# si ambos corren en la misma máquina.
+name: beematch-prod
+
+x-registro: &registro
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: beematch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env.production}
+      POSTGRES_DB: beematch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beematch -d beematch"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    <<: *registro
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF: la cola de trabajos sobrevive a un reinicio de Redis.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    <<: *registro
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      ENTORNO: produccion
+      DATABASE_URL: postgresql+psycopg://beematch:${POSTGRES_PASSWORD}@db:5432/beematch
+      REDIS_URL: redis://redis:6379/0
+      # El planificador corre en el worker, no en la API.
+      PLANIFICADOR_EN_API: "false"
+    command:
+      - uvicorn
+      - backend.main:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health/ready', timeout=4).status == 200 else 1)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 30s
+    <<: *registro
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      ENTORNO: produccion
+      DATABASE_URL: postgresql+psycopg://beematch:${POSTGRES_PASSWORD}@db:5432/beematch
+      REDIS_URL: redis://redis:6379/0
+    # Un único worker lleva --planificador (sincroniza el repositorio cada 6 h).
+    command: ["python", "-m", "backend.workers.run_worker", "--planificador"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    <<: *registro
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.dockerfile
+    restart: unless-stopped
+    environment:
+      # :80 = HTTP con la IP del servidor. Un dominio = HTTPS automático.
+      SITIO: ${SITIO:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_datos:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    <<: *registro
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_datos:
+  caddy_config:

@@ -7,15 +7,20 @@ from backend.api import (
     auth,
     busquedas,
     candidatos,
+    clientes,
     configuracion,
     dashboard,
     hojas_vida,
     preseleccion,
     solicitudes,
 )
-from backend.config import ALLOWED_ORIGINS
+from backend.config import ALLOWED_ORIGINS, PLANIFICADOR_EN_API
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import init_db
+from backend.logging_config import RegistroDePeticiones, configurar_logging, iniciar_sentry
+
+configurar_logging()
+iniciar_sentry()
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +30,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(RegistroDePeticiones)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -37,6 +43,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(solicitudes.router, prefix="/solicitudes", tags=["Solicitudes"])
 app.include_router(busquedas.router, prefix="/busquedas", tags=["Búsquedas"])
 app.include_router(preseleccion.router, prefix="/preseleccion", tags=["Preselección"])
+app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
 app.include_router(candidatos.router, prefix="/candidatos", tags=["Candidatos"])
 app.include_router(hojas_vida.router, prefix="/hojas-vida", tags=["Hojas de vida"])
 app.include_router(configuracion.router, prefix="/configuracion", tags=["Configuración"])
@@ -44,6 +51,9 @@ app.include_router(configuracion.router, prefix="/configuracion", tags=["Configu
 
 @app.on_event("startup")
 def on_startup():
+    from backend.produccion import validar_configuracion_de_produccion
+
+    validar_configuracion_de_produccion()
     init_db()
     _informar_cola()
     _sembrar_parametros()
@@ -51,8 +61,9 @@ def on_startup():
     _sembrar_repositorio()
 
     # El planificador solo arranca si APScheduler está instalado y hay un
-    # origen de hojas de vida configurado, sea cual sea el proveedor.
-    if _hay_origen_configurado():
+    # origen de hojas de vida configurado, sea cual sea el proveedor. Con varias
+    # instancias de la API se apaga aquí y corre en el worker (PLANIFICADOR_EN_API).
+    if PLANIFICADOR_EN_API and _hay_origen_configurado():
         from backend.workers.scheduler import iniciar_planificador
 
         iniciar_planificador()
@@ -93,15 +104,19 @@ def _hay_origen_configurado() -> bool:
 
 
 def _sembrar_parametros():
-    """Valores por defecto del motor de recomendación (HU-07)."""
-    from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS, UMBRAL_AFINIDAD_MINIMA
+    """
+    Valores por defecto del motor de recomendación.
+
+    El número de candidatos y el umbral de afinidad (HU-07) no se siembran: sin
+    fila guardada rigen los de config.py, y solo se escriben cuando el
+    administrador los cambia.
+    """
+    from backend.config import FINALISTAS_RERANK
     from backend.infrastructure.persistence.database import SessionLocal
     from backend.infrastructure.persistence.repositories.configuracion_repo import ParametroRepository
 
     defaults = {
-        "top_n_resultados": str(TOP_N_RESULTADOS),
         "finalistas_rerank": str(FINALISTAS_RERANK),
-        "umbral_afinidad_minima": str(UMBRAL_AFINIDAD_MINIMA),
     }
 
     db = SessionLocal()
@@ -230,4 +245,33 @@ def _sembrar_repositorio():
 
 @app.get("/health")
 def health():
+    """Vivacidad: el proceso responde. No toca la base ni Redis."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """
+    Disponibilidad: la base responde. Redis se informa pero no tumba el estado,
+    porque sin Redis la API sigue trabajando (ver docs/redis-y-worker.md).
+    Es lo que consultan el healthcheck del contenedor y el balanceador.
+    """
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+
+    from backend.infrastructure.persistence.database import engine
+    from backend.workers.queue import get_cola, hay_workers
+
+    try:
+        with engine.connect() as conexion:
+            conexion.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("La base de datos no responde.")
+        return JSONResponse(status_code=503, content={"status": "error", "base_de_datos": "no responde"})
+
+    cola = get_cola()
+    if cola is None:
+        redis = "no disponible"
+    else:
+        redis = "con worker" if hay_workers(cola) else "sin worker"
+    return {"status": "ok", "base_de_datos": "ok", "redis": redis}

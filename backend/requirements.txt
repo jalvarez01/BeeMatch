@@ -14,6 +14,7 @@ cryptography==50.0.1
 # Base de datos
 psycopg[binary]==3.2.3
 pgvector==0.3.5
+alembic==1.13.3
 
 # Cola de trabajos y planificación
 redis==5.1.1
@@ -43,7 +44,10 @@ pdf2image==1.17.0
 
 # Exportación
 openpyxl==3.1.5
-weasyprint==62.3
+fpdf2==2.8.4
+
+# Observabilidad (opcional: solo actúa si SENTRY_DSN está definido)
+sentry-sdk==2.19.0
 
 # Pruebas
 pytest==8.3.3

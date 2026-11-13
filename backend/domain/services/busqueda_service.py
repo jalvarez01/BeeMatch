@@ -5,21 +5,26 @@ Ejecuta las tres etapas y persiste el Top-N con su desglose explicable.
 Lo invoca el worker de búsqueda, nunca la petición HTTP directamente (RNF04).
 """
 
+import logging
 import time
 from datetime import timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from backend.config import FINALISTAS_RERANK, TOP_N_RESULTADOS
+from backend.config import FINALISTAS_RERANK
+from backend.domain.matching.criterios import lineas_de_criterios
 from backend.domain.matching.filtros import FiltroDuro
 from backend.domain.matching.reranker import Reranker
 from backend.domain.matching.retriever import RecuperadorHibrido
 from backend.domain.matching.scorer import supera_umbral
 from backend.domain.services.bitacora_service import (
+    ACCION_BUSQUEDA_EJECUTADA,
     ACCION_ERROR_SERVICIO,
     BitacoraService,
 )
+from backend.domain.services.parametros_busqueda import leer_parametros, parametros_de_solicitud
+from backend.domain.services.parametros_service import ParametrosRecomendacionService
 from backend.infrastructure.llm.embeddings import (
     ProveedorEmbeddings,
     ProveedorEmbeddingsNoDisponibleError,
@@ -47,8 +52,15 @@ from backend.infrastructure.persistence.models.solicitud import (
 )
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 from backend.infrastructure.persistence.repositories.candidato_repo import CandidatoRepository
+from backend.infrastructure.persistence.repositories.cliente_repo import (
+    ClienteRepository,
+    ProyectoRepository,
+)
 from backend.infrastructure.persistence.repositories.hoja_vida_repo import HojaDeVidaRepository
 from backend.infrastructure.persistence.repositories.solicitud_repo import SolicitudRepository
+from backend.schemas.busqueda import ParametrosBusqueda
+
+logger = logging.getLogger(__name__)
 
 # Una búsqueda pendiente o ejecutándose más tiempo que esto se da por abandonada.
 # Supera el job_timeout de la cola (900 s), así que ningún trabajo vivo la alcanza.
@@ -67,9 +79,38 @@ class BusquedaService:
         self.reranker = Reranker()
         self.embeddings = ProveedorEmbeddings()
 
-    def encolar(self, solicitud_id: str) -> str:
-        """Crea la búsqueda y devuelve su id para que el frontend haga polling."""
-        busqueda = self.busquedas.crear(solicitud_id)
+    def encolar(self, solicitud_id: str, usuario_id: Optional[str] = None) -> str:
+        """
+        Crea la búsqueda y devuelve su id para que el frontend haga polling.
+
+        HU-15: guarda con ella una copia de los criterios, el cliente y el proyecto
+        de la solicitud en este momento. Es lo que analiza el worker y lo que muestra
+        la ejecución después, aunque la solicitud se edite o se vuelva a ejecutar.
+
+        Aquí queda también el evento de bitácora de HU-06: la búsqueda se crea una
+        sola vez, mientras que el worker (o el respaldo dentro de la API) puede
+        ejecutarla por caminos distintos.
+        """
+        solicitud = self.solicitudes.get_by_id(solicitud_id)
+        parametros = (
+            parametros_de_solicitud(
+                solicitud,
+                self.solicitudes.listar_criterios(solicitud_id),
+                ClienteRepository(self.db),
+                ProyectoRepository(self.db),
+            )
+            if solicitud
+            else None
+        )
+        busqueda = self.busquedas.crear(
+            solicitud_id, parametros_json=parametros.model_dump_json() if parametros else None
+        )
+        BitacoraService(self.db).registrar(
+            accion=ACCION_BUSQUEDA_EJECUTADA,
+            usuario_id=usuario_id,
+            entidad="busqueda",
+            entidad_id=busqueda.id,
+        )
         return busqueda.id
 
     def en_curso(self, solicitud_id: str) -> Optional[BusquedaModel]:
@@ -93,9 +134,12 @@ class BusquedaService:
             self.busquedas.finalizar(busqueda_id, estado=BUSQUEDA_EJECUTANDO)
             self.busquedas.actualizar_progreso(busqueda_id, "Preparando la consulta", 10)
 
-            criterios = self.solicitudes.listar_criterios(solicitud.id)
-            consulta = self._construir_consulta(solicitud, criterios)
-            requisitos = self._construir_requisitos(solicitud, criterios)
+            # HU-15: se analiza la copia guardada al encolar, no la solicitud viva, para
+            # que una edición hecha mientras la búsqueda espera no cambie lo que ya se pidió.
+            pedido = self._parametros_de(busqueda, solicitud)
+            criterios = pedido.criterios
+            consulta = self._construir_consulta(pedido, criterios)
+            requisitos = self._construir_requisitos(pedido, criterios)
 
             # Etapa 1: recuperación híbrida
             self.busquedas.actualizar_progreso(busqueda_id, "Buscando en las hojas de vida", 35)
@@ -106,7 +150,7 @@ class BusquedaService:
             self.busquedas.actualizar_progreso(busqueda_id, "Aplicando requisitos obligatorios", 55)
             finalistas = self._agrupar_por_candidato(fragmentos)
             ids_filtrados = self.filtro.aplicar(
-                [f["candidato_id"] for f in finalistas], solicitud.experiencia_min
+                [f["candidato_id"] for f in finalistas], pedido.experiencia_min
             )
             finalistas = [f for f in finalistas if f["candidato_id"] in ids_filtrados][:FINALISTAS_RERANK]
 
@@ -118,6 +162,10 @@ class BusquedaService:
             self.busquedas.actualizar_progreso(busqueda_id, "Analizando los perfiles finalistas", 80)
             resultados, respuesta_ia = self.reranker.ordenar_y_explicar(consulta, requisitos, finalistas)
 
+            # HU-07: los parámetros se leen al ejecutar, no al arrancar, para que un
+            # cambio del administrador aplique a las búsquedas que se lancen después.
+            parametros = ParametrosRecomendacionService(self.db).obtener()
+
             recomendaciones = [
                 {
                     "candidato_id": r["candidato_id"],
@@ -127,8 +175,8 @@ class BusquedaService:
                     "coincidencias": r["coincidencias"],
                 }
                 for r in resultados
-                if supera_umbral(r["puntaje_afinidad"])
-            ][:TOP_N_RESULTADOS]
+                if supera_umbral(r["puntaje_afinidad"], parametros.umbral_afinidad)
+            ][: parametros.num_candidatos]
 
             self.busquedas.guardar_recomendaciones(busqueda_id, recomendaciones)
             self.busquedas.actualizar_progreso(busqueda_id, "Listo", 100)
@@ -173,6 +221,10 @@ class BusquedaService:
             self.solicitudes.cambiar_estado(solicitud.id, ESTADO_ERROR)
 
         except Exception as exc:  # noqa: BLE001
+            # Al usuario se le da un mensaje genérico; el detalle técnico va al log con su
+            # traza (antes solo iba a la bitácora, y esta fallaba en silencio si el error
+            # venía de la base de datos).
+            logger.exception("Error inesperado en la búsqueda %s", busqueda_id)
             self._registrar_error(solicitud, "ERROR_INESPERADO", str(exc))
             self.busquedas.finalizar(
                 busqueda_id,
@@ -186,14 +238,31 @@ class BusquedaService:
 
     # --- Internos ------------------------------------------------------------
 
+    def _parametros_de(self, busqueda: BusquedaModel, solicitud) -> ParametrosBusqueda:
+        """La copia de la ejecución; en las anteriores a HU-15, la solicitud tal como está."""
+        guardados = leer_parametros(busqueda)
+        if guardados:
+            return guardados
+        return parametros_de_solicitud(
+            solicitud,
+            self.solicitudes.listar_criterios(solicitud.id),
+            ClienteRepository(self.db),
+            ProyectoRepository(self.db),
+        )
+
     def _construir_consulta(self, solicitud, criterios) -> str:
+        """
+        HU-09: combina todo lo diligenciado (descripción, rol, experiencia y cada
+        grupo de criterios) en una sola consulta. Los grupos van con su nombre
+        (tecnologías, frameworks, otros conocimientos, idiomas) para que el
+        análisis distinga qué pidió la coordinadora en cada campo.
+        """
         partes = [solicitud.descripcion_libre or ""]
         if solicitud.rol_buscado:
             partes.append(f"Rol: {solicitud.rol_buscado}")
         if solicitud.experiencia_min:
             partes.append(f"Experiencia mínima: {solicitud.experiencia_min} años")
-        if criterios:
-            partes.append("Requisitos: " + ", ".join(c.valor for c in criterios))
+        partes.extend(lineas_de_criterios(criterios))
         return "\n".join(p for p in partes if p)
 
     def _construir_requisitos(self, solicitud, criterios) -> list[str]:
@@ -247,16 +316,21 @@ class BusquedaService:
 
     def _registrar_error(self, solicitud, tipo_error: str, detalle: str) -> None:
         """Registra en la bitácora los errores que impiden completar una búsqueda."""
-        try:
-            BitacoraService(self.db).registrar(
-                accion=ACCION_ERROR_SERVICIO,
-                usuario_id=solicitud.usuario_id,
-                entidad="solicitud",
-                entidad_id=solicitud.id,
-                detalle=f"tipo={tipo_error}; detalle={detalle}",
-            )
-        except Exception:
-            self.db.rollback()
+        # Si el error vino de la base de datos, la transacción quedó rota y no admite
+        # más escrituras hasta un rollback: el primer intento falla y el segundo, ya
+        # con la sesión limpia, sí queda. Antes se perdía el registro en silencio.
+        for _intento in range(2):
+            try:
+                BitacoraService(self.db).registrar(
+                    accion=ACCION_ERROR_SERVICIO,
+                    usuario_id=solicitud.usuario_id,
+                    entidad="solicitud",
+                    entidad_id=solicitud.id,
+                    detalle=f"tipo={tipo_error}; detalle={detalle}",
+                )
+                return
+            except Exception:
+                self.db.rollback()
 
     def marcar_error_repositorio(
         self,

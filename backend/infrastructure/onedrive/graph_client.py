@@ -92,7 +92,7 @@ class GraphClient(RepositorioDocumentos):
                 timeout=30,
             )
         except httpx.HTTPError as exc:
-            raise OneDriveError(f"No se pudo contactar a Microsoft: {exc}")
+            raise OneDriveError(f"No se pudo contactar a Microsoft: {exc}") from exc
 
         if respuesta.status_code != 200:
             raise CredencialesInvalidasError(self._describir_error_token(respuesta))
@@ -181,7 +181,7 @@ class GraphClient(RepositorioDocumentos):
         try:
             respuesta = httpx.get(url, headers=self._headers(), timeout=60)
         except httpx.HTTPError as exc:
-            raise OneDriveError(f"Error de red consultando OneDrive: {exc}")
+            raise OneDriveError(f"Error de red consultando OneDrive: {exc}") from exc
 
         if respuesta.status_code == 404:
             raise RepositorioNoEncontradoError(
@@ -236,7 +236,7 @@ class GraphClient(RepositorioDocumentos):
             respuesta = httpx.get(url, headers=self._headers(), timeout=120, follow_redirects=True)
             respuesta.raise_for_status()
         except httpx.HTTPError as exc:
-            raise OneDriveError(f"No fue posible descargar el documento: {exc}")
+            raise OneDriveError(f"No fue posible descargar el documento: {exc}") from exc
         return respuesta.content
 
     @staticmethod

@@ -1,0 +1,53 @@
+# La misma suite de pruebas, pero contra PostgreSQL 16 con pgvector: el motor de
+# producción. Es lo único que ejercita la búsqueda vectorial (HNSW), la léxica
+# (tsvector en español, GIN) y la migración de datos desde SQLite.
+name: CI PostgreSQL
+
+on:
+  push:
+    branches: [development, main]
+  pull_request:
+    branches: [development, main]
+
+concurrency:
+  group: ci-postgres-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas-postgres:
+    name: Pruebas sobre PostgreSQL con pgvector
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: beematch
+          POSTGRES_PASSWORD: beematch
+          POSTGRES_DB: beematch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beematch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PRUEBAS_DATABASE_URL: postgresql+psycopg://beematch:beematch@localhost:5432/beematch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r backend/requirements.txt
+
+      - name: Pruebas
+        run: python -m pytest -q

@@ -1,0 +1,49 @@
+# La suite con un Redis real: ejercita la cola (RQ con un worker de verdad), la
+# degradación cuando no hay worker y la caché de embeddings (C15, C17 y C22).
+# Sin PRUEBAS_REDIS_URL esas pruebas se omiten solas.
+name: CI Redis
+
+on:
+  push:
+    branches: [development, main]
+  pull_request:
+    branches: [development, main]
+
+concurrency:
+  group: ci-redis-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas-redis:
+    name: Pruebas con Redis real
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PRUEBAS_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r backend/requirements.txt
+
+      - name: Pruebas
+        run: python -m pytest -q

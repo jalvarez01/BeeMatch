@@ -6,20 +6,42 @@ import {
   esperaCancelada,
   esperarResultado,
   etapaPorDefecto,
+  listarEjecuciones,
   marcarPreseleccion,
   obtenerResultados,
+  reejecutarBusqueda,
 } from '../api/busquedas'
 import { exportarPreseleccion } from '../api/preseleccion'
 import { obtenerSolicitud } from '../api/solicitudes'
 import { AfinidadBadge, AfinidadPorcentaje, LeyendaAfinidad, Tag } from '../components/Badges'
 import BarraProgreso from '../components/BarraProgreso'
+import CriteriosSolicitud from '../components/CriteriosSolicitud'
 import EstadoVacio from '../components/EstadoVacio'
+import FormularioSolicitud from '../components/FormularioSolicitud'
 import { IconSpark } from '../components/Icons'
-import type { BusquedaResultado, Solicitud } from '../types'
+import ListaEjecuciones from '../components/ListaEjecuciones'
+import { crearGuardaEnvio } from '../lib/envioUnico'
+import { formatearFechaHora } from '../lib/formato'
+import {
+  construirAjuste,
+  enfocarCampo,
+  origenDeSolicitud,
+  primerCampoConError,
+  validarSolicitud,
+  valoresDesde,
+  valoresVacios,
+  type ErroresSolicitud,
+  type ValoresSolicitud,
+} from '../lib/solicitudForm'
+import type { BusquedaResultado, EjecucionResumen, Solicitud } from '../types'
 
 const MENSAJE_SIN_CANDIDATOS = 'No se encontraron candidatos afines al perfil solicitado'
+// HU-25: el mismo texto que responde el backend (export_service.MENSAJE_SIN_PRESELECCION).
+const MENSAJE_SIN_PRESELECCION = 'Debes seleccionar al menos un candidato para exportar.'
 
-/** HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
+const PREFIJO_AJUSTE = 'ajuste-'
+
+/** HU-09, HU-12, HU-15, HU-17, HU-18, HU-20, HU-22, HU-23, HU-24, HU-25. */
 export default function Resultados() {
   const { busquedaId = '' } = useParams()
   const navegar = useNavigate()
@@ -31,6 +53,19 @@ export default function Resultados() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [solicitudIdReintento, setSolicitudIdReintento] = useState('')
+  const [avisoPreseleccion, setAvisoPreseleccion] = useState('')
+  const [avisoExportacion, setAvisoExportacion] = useState('')
+  const [exportando, setExportando] = useState<'PDF' | 'XLSX' | null>(null)
+
+  // HU-15: ejecuciones de la solicitud y panel para ajustar los criterios.
+  const [ejecuciones, setEjecuciones] = useState<EjecucionResumen[]>([])
+  const [ajustando, setAjustando] = useState(false)
+  const [valoresAjuste, setValoresAjuste] = useState<ValoresSolicitud>(valoresVacios)
+  const [erroresAjuste, setErroresAjuste] = useState<ErroresSolicitud>({})
+  const [errorAjuste, setErrorAjuste] = useState('')
+  const [enviandoAjuste, setEnviandoAjuste] = useState(false)
+  // Bloquea el segundo clic de inmediato, sin esperar a que el botón se pinte deshabilitado.
+  const guardaAjuste = useRef(crearGuardaEnvio())
 
   // HU-22: al salir de la pantalla, o al volver a intentar, se deja de sondear el
   // análisis anterior en vez de dejarlo corriendo en segundo plano.
@@ -45,9 +80,20 @@ export default function Resultados() {
     setError('')
     setEtapa('Preparando la consulta')
     setProgreso(0)
+    // HU-15: al pasar a otra ejecución no se deja a la vista la anterior mientras la nueva se procesa.
+    setResultado(null)
+    setSolicitud(null)
+    setAjustando(false)
+    setErrorAjuste('')
     try {
       const inicial = await obtenerResultados(busquedaId)
       setSolicitudIdReintento(inicial.solicitud_id)
+      // Sin la lista de ejecuciones la pantalla funciona igual: solo falta el selector.
+      listarEjecuciones(inicial.solicitud_id)
+        .then((lista) => {
+          if (!actual.signal.aborted) setEjecuciones(lista)
+        })
+        .catch(() => setEjecuciones([]))
 
       const final =
         inicial.estado === 'COMPLETADA'
@@ -97,27 +143,81 @@ export default function Resultados() {
     }
   }
 
+  // HU-24: la casilla cambia al instante. Si el servidor no guarda el cambio,
+  // vuelve a su estado anterior y se avisa sin perder la pantalla de resultados.
   const alternarPreseleccion = async (recomendacionId: string, valor: boolean) => {
-    const actualizada = await marcarPreseleccion(recomendacionId, valor)
-    setResultado((previo) =>
-      previo
-        ? {
-            ...previo,
-            recomendaciones: previo.recomendaciones.map((r) =>
-              r.id === recomendacionId ? { ...r, preseleccionado: actualizada.preseleccionado } : r,
-            ),
-          }
-        : previo,
-    )
-  }
+    const fijar = (preseleccionado: boolean) =>
+      setResultado((previo) =>
+        previo
+          ? {
+              ...previo,
+              recomendaciones: previo.recomendaciones.map((r) =>
+                r.id === recomendacionId ? { ...r, preseleccionado } : r,
+              ),
+            }
+          : previo,
+      )
 
-  const exportar = async () => {
+    setAvisoPreseleccion('')
+    setAvisoExportacion('')
+    fijar(valor)
     try {
-      await exportarPreseleccion(busquedaId, 'XLSX')
+      const actualizada = await marcarPreseleccion(recomendacionId, valor)
+      fijar(actualizada.preseleccionado)
     } catch (e) {
-      setError((e as Error).message)
+      fijar(!valor)
+      setAvisoPreseleccion(`No se pudo guardar la preselección. ${(e as Error).message}`)
     }
   }
+
+  // HU-25: los errores de la exportación se avisan sin cambiar la pantalla de resultados.
+  const exportar = async (formato: 'PDF' | 'XLSX') => {
+    setAvisoExportacion('')
+    if (!resultado?.recomendaciones.some((r) => r.preseleccionado)) {
+      setAvisoExportacion(MENSAJE_SIN_PRESELECCION)
+      return
+    }
+    setExportando(formato)
+    try {
+      await exportarPreseleccion(busquedaId, formato)
+    } catch (e) {
+      setAvisoExportacion((e as Error).message)
+    } finally {
+      setExportando(null)
+    }
+  }
+
+  /** HU-15: abre el panel con los criterios de ESTA ejecución como valores iniciales. */
+  const abrirAjuste = () => {
+    if (!resultado) return
+    const origen = resultado.parametros ?? (solicitud ? origenDeSolicitud(solicitud) : null)
+    setValoresAjuste(origen ? valoresDesde(origen) : valoresVacios())
+    setErroresAjuste({})
+    setErrorAjuste('')
+    setAjustando(true)
+  }
+
+  const confirmarAjuste = () =>
+    guardaAjuste.current.ejecutar(async () => {
+      if (!resultado) return
+      setErrorAjuste('')
+      const encontrados = validarSolicitud(valoresAjuste, true)
+      setErroresAjuste(encontrados)
+      const primero = primerCampoConError(encontrados)
+      if (primero) {
+        enfocarCampo(PREFIJO_AJUSTE, primero)
+        return
+      }
+      setEnviandoAjuste(true)
+      try {
+        const nueva = await reejecutarBusqueda(resultado.solicitud_id, construirAjuste(valoresAjuste))
+        navegar(`/resultados/${nueva.id}`)
+      } catch (e) {
+        setErrorAjuste((e as Error).message)
+      } finally {
+        setEnviandoAjuste(false)
+      }
+    })
 
   if (cargando && !resultado) {
     return <BarraProgreso etapa={etapa} progreso={progreso} />
@@ -135,13 +235,30 @@ export default function Resultados() {
         >
           {cargando ? 'Reintentando...' : 'Reintentar'}
         </button>
+        {/* HU-15: si un ajuste falla, las ejecuciones anteriores siguen disponibles. */}
+        <div style={{ marginTop: 18 }}>
+          <ListaEjecuciones
+            ejecuciones={ejecuciones}
+            actualId={busquedaId}
+            onAbrir={(id) => navegar(`/resultados/${id}`)}
+          />
+        </div>
       </>
     )
   }
 
   if (!resultado) return null
 
-  const criterios = solicitud?.criterios.map((c) => c.valor) ?? []
+  const preseleccionados = resultado.recomendaciones.filter((r) => r.preseleccionado).length
+  // HU-15: lo que se pidió en ESTA ejecución. Las anteriores a HU-15 no lo guardaron: se usa la solicitud.
+  const parametros = resultado.parametros
+  const rolBuscado = parametros ? parametros.rol_buscado : (solicitud?.rol_buscado ?? null)
+  const clienteNombre = parametros ? parametros.cliente : (solicitud?.cliente_nombre ?? null)
+  const proyectoNombre = parametros ? parametros.proyecto : (solicitud?.proyecto_nombre ?? null)
+  const experienciaMin = parametros ? parametros.experiencia_min : (solicitud?.experiencia_min ?? null)
+  const criterios = parametros?.criterios ?? solicitud?.criterios ?? []
+  const esAnterior = ejecuciones.some((e) => e.id === resultado.id && !e.es_mas_reciente)
+  const masReciente = ejecuciones.find((e) => e.es_mas_reciente)
 
   return (
     <>
@@ -151,23 +268,92 @@ export default function Resultados() {
 
       <div className="bm-row-between" style={{ marginBottom: 16 }}>
         <div>
-          <h2 className="bm-h2">{solicitud?.rol_buscado ?? 'Perfil solicitado'}</h2>
+          <h2 className="bm-h2">{rolBuscado ?? 'Perfil solicitado'}</h2>
           <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 6px' }}>
-            {solicitud?.cliente_nombre} · {solicitud?.proyecto_nombre}
+            {[clienteNombre ?? 'Sin cliente', proyectoNombre].filter(Boolean).join(' · ')}
           </p>
-          <p style={{ fontSize: 11, color: 'var(--muted-2)', margin: 0 }}>
-            {[...criterios, solicitud?.experiencia_min ? `${solicitud.experiencia_min}+ años` : '']
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+          {/* HU-09 y HU-15: los criterios de ESTA ejecución, agrupados como en el formulario. */}
+          <CriteriosSolicitud criterios={criterios} experienciaMin={experienciaMin} />
+          {resultado.total_ejecuciones > 1 && (
+            <p style={{ fontSize: 11, color: 'var(--muted-2)', margin: '4px 0 0' }}>
+              Ejecución {resultado.numero_ejecucion} de {resultado.total_ejecuciones}
+              {resultado.created_at && ` · ${formatearFechaHora(resultado.created_at)}`}
+            </p>
+          )}
         </div>
-        <button
-          className="bm-btn bm-btn-ghost"
-          onClick={() => navegar(`/nueva-busqueda?solicitud=${resultado.solicitud_id}`)}
-        >
-          Ajustar criterios
-        </button>
+        {!ajustando && (
+          <button className="bm-btn bm-btn-ghost" onClick={abrirAjuste}>
+            Ajustar criterios
+          </button>
+        )}
       </div>
+
+      {esAnterior && (
+        <div className="bm-banner-anterior" role="status">
+          <span>
+            Estás viendo una ejecución anterior ({resultado.numero_ejecucion} de{' '}
+            {resultado.total_ejecuciones}). Los resultados más recientes son otros.
+          </span>
+          {masReciente && (
+            <button
+              className="bm-btn bm-btn-ghost"
+              onClick={() => navegar(`/resultados/${masReciente.id}`)}
+            >
+              Ver la más reciente →
+            </button>
+          )}
+        </div>
+      )}
+
+      {ajustando && (
+        // HU-15: criterios de esta ejecución, editables, con cliente y proyecto. Al confirmar se
+        // ejecuta de nuevo y la ejecución actual queda guardada con sus propios criterios.
+        <section className="bm-card" aria-label="Ajustar criterios" style={{ marginBottom: 22 }}>
+          <h2 className="bm-h2" style={{ marginTop: 0 }}>
+            Ajustar criterios
+          </h2>
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px' }}>
+            Estos son los criterios de la ejecución que estás viendo. Edítalos y vuelve a buscar:
+            esta ejecución y sus resultados se conservan en el historial.
+          </p>
+          {errorAjuste && (
+            <div className="bm-alert bm-alert-error" role="alert">
+              {errorAjuste}
+            </div>
+          )}
+          <FormularioSolicitud
+            valores={valoresAjuste}
+            onCambio={setValoresAjuste}
+            errores={erroresAjuste}
+            onErrores={setErroresAjuste}
+            deshabilitado={enviandoAjuste}
+            prefijo={PREFIJO_AJUSTE}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+            <button
+              className="bm-btn bm-btn-soft"
+              onClick={() => setAjustando(false)}
+              disabled={enviandoAjuste}
+            >
+              Cancelar
+            </button>
+            <button
+              className="bm-btn bm-btn-primary"
+              onClick={() => void confirmarAjuste()}
+              disabled={enviandoAjuste}
+              aria-busy={enviandoAjuste}
+            >
+              {enviandoAjuste ? 'Analizando…' : 'Confirmar y volver a buscar'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <ListaEjecuciones
+        ejecuciones={ejecuciones}
+        actualId={resultado.id}
+        onAbrir={(id) => navegar(`/resultados/${id}`)}
+      />
 
       <div
         className="bm-tip"
@@ -195,9 +381,36 @@ export default function Resultados() {
             </p>
             <LeyendaAfinidad />
           </div>
-          <button className="bm-btn bm-btn-dark" onClick={exportar}>
-            Exportar preselección
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+              {preseleccionados === 1
+                ? '1 candidato preseleccionado'
+                : `${preseleccionados} candidatos preseleccionados`}
+            </span>
+            <button
+              className="bm-btn bm-btn-dark"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => void exportar('PDF')}
+              disabled={exportando !== null}
+            >
+              {exportando === 'PDF' ? 'Generando…' : 'Exportar PDF'}
+            </button>
+            <button
+              className="bm-btn bm-btn-ghost"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={() => void exportar('XLSX')}
+              disabled={exportando !== null}
+            >
+              {exportando === 'XLSX' ? 'Generando…' : 'Exportar Excel'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {avisoPreseleccion && <div className="bm-alert bm-alert-error">{avisoPreseleccion}</div>}
+      {avisoExportacion && (
+        <div className="bm-alert bm-alert-error" role="alert">
+          {avisoExportacion}
         </div>
       )}
 
@@ -212,10 +425,7 @@ export default function Resultados() {
             'la experiencia mínima.'
           }
           accion={
-            <button
-              className="bm-btn bm-btn-primary"
-              onClick={() => navegar(`/nueva-busqueda?solicitud=${resultado.solicitud_id}`)}
-            >
+            <button className="bm-btn bm-btn-primary" onClick={abrirAjuste}>
               Ajustar criterios de búsqueda
             </button>
           }

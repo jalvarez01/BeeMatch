@@ -17,6 +17,7 @@
   --green-tx: #17663A;
   --red: #DC2626;
   --red-bg: #FDECEC;
+  --red-action: #B84D55;
   --slate-btn: #4B5563;
 
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -103,6 +104,12 @@
 
 .bm .bm-btn-ghost { background: var(--white); border: 1px solid var(--line); }
 .bm .bm-btn-ghost:hover { border-color: #C9CDD4; }
+.bm .bm-btn-ghost.bm-btn-soft { background: #F4F4F5; color: var(--ink-soft); }
+.bm .bm-btn-draft-hover:hover { background: #E9E9EB; }
+.bm .bm-btn-compact { width: fit-content; padding: 5px 10px; font-size: 12px; line-height: 1.25; }
+.bm .bm-btn-delete-hover { transition: background .15s, border-color .15s, color .15s; }
+.bm .bm-btn-delete-hover:hover { background: var(--red-action); border-color: var(--red-action); color: #fff; }
+.bm .bm-btn-delete { width: fit-content; background: var(--red-action); border: 1px solid var(--red-action); color: #fff; }
 .bm .bm-btn:disabled { opacity: .5; cursor: not-allowed; }
 .bm-btn-link { color: var(--muted); font-size: 13px; }
 .bm-btn-link:hover { color: var(--ink); }
@@ -214,6 +221,7 @@
 .bm-search input:focus { outline: none; }
 .bm-hist-row { display: grid; grid-template-columns: 1.5fr 1fr auto auto; gap: 16px; align-items: center; padding: 16px 4px; }
 .bm-hist-row + .bm-hist-row { border-top: 1px solid var(--line); }
+.bm-solicitud-desc { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .bm-pager { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; }
 .bm-pager button { width: 26px; height: 26px; border-radius: 6px; font-size: 12px; color: var(--muted); }
 .bm-pager button[data-active='true'] { background: var(--yellow); color: var(--ink); font-weight: 600; }
@@ -298,3 +306,43 @@
 .bm-user-row select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; background: var(--white); }
 .bm-user-acciones { display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 860px) { .bm-user-row { grid-template-columns: 1fr; } .bm-user-acciones { justify-content: flex-start; } }
+
+/* HU-06: bitácora de actividad */
+.bm-bit-filtros { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 12px; align-items: end; }
+.bm-bit-botones { display: flex; gap: 8px; }
+.bm-bit-row { display: grid; grid-template-columns: 0.8fr 0.6fr 1.6fr 1fr 2fr; gap: 16px; align-items: start; padding: 12px 4px; font-size: 13px; }
+.bm-bit-row + .bm-bit-row { border-top: 1px solid var(--line); }
+.bm-bit-head { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.bm-bit-sub { display: block; font-size: 11px; color: var(--muted-2); overflow-wrap: anywhere; }
+.bm-pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (max-width: 860px) {
+  .bm-bit-filtros { grid-template-columns: 1fr; }
+  .bm-bit-row { grid-template-columns: 1fr; gap: 4px; }
+  .bm-bit-head { display: none; }
+}
+.bm-hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+/* ---------- HU-12: sugerencias de cliente ---------- */
+.bm-suggest { position: relative; flex: 1; min-width: 0; display: flex; }
+.bm-suggest input { width: 100%; }
+.bm-suggest-list {
+  position: absolute; z-index: 20; top: calc(100% + 10px); right: -12px; left: -120px;
+  margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto;
+  background: var(--white); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.bm-suggest-list li { padding: 8px 10px; font-size: 13px; border-radius: 6px; cursor: pointer; text-align: left; }
+.bm-suggest-list li:hover, .bm-suggest-list li[data-active='true'] { background: var(--yellow-soft); }
+
+/* ---------- HU-15: ejecuciones de una solicitud ---------- */
+.bm-exec { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px 4px; }
+.bm-exec + .bm-exec { border-top: 1px solid var(--line); }
+.bm-exec[data-actual='true'] { background: var(--yellow-soft); border-radius: 8px; padding-left: 12px; padding-right: 12px; }
+.bm-exec-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bm-banner-anterior { background: #F4F4F5; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- HU-09: criterios estructurados de la solicitud ---------- */
+.bm-criterios { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; }
+.bm-criterios-grupo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.bm-criterios-grupo dt { font-size: 11px; color: var(--muted-2); }
+.bm-criterios-grupo dd { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 0; }

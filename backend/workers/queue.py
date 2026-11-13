@@ -5,6 +5,7 @@ Las operaciones largas no pueden vivir dentro de una petición HTTP: una búsque
 puede tardar hasta 2 minutos y la ingesta inicial decenas (RNF04).
 """
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Optional
 
@@ -12,6 +13,8 @@ from backend.config import REDIS_URL
 
 if TYPE_CHECKING:
     from fastapi import BackgroundTasks
+
+logger = logging.getLogger(__name__)
 
 _cola = None
 
@@ -50,8 +53,45 @@ def hay_workers(cola) -> bool:
         from rq import Worker
 
         return Worker.count(queue=cola) > 0
-    except Exception:
+    except Exception as exc:
+        if _redis_caido(exc):
+            _olvidar_cola()
+            return False
         return True
+
+
+def _redis_caido(error: Exception) -> bool:
+    """¿El error es de conexión con Redis (y no un fallo del trabajo)?"""
+    try:
+        from redis.exceptions import ConnectionError as ErrorDeConexion
+        from redis.exceptions import TimeoutError as ErrorDeTiempo
+
+        return isinstance(error, (ErrorDeConexion, ErrorDeTiempo, OSError))
+    except ImportError:
+        return False
+
+
+def _olvidar_cola() -> None:
+    """Descarta la conexión guardada para que la siguiente llamada vuelva a comprobar."""
+    global _cola
+    _cola = None
+
+
+def _enviar_a_la_cola(cola, funcion: Callable, args: tuple, timeout: int) -> Optional[str]:
+    """
+    Encola el trabajo. Si Redis dejó de responder después de haberse conectado
+    (se cayó con la API ya en marcha), devuelve None en vez de propagar el error
+    para que quien llama ejecute el trabajo por su cuenta: una búsqueda no debe
+    fallar con 500 porque la cola no esté.
+    """
+    try:
+        return cola.enqueue(funcion, *args, job_timeout=timeout).id
+    except Exception as exc:
+        if not _redis_caido(exc):
+            raise
+        logger.warning("Redis dejó de responder al encolar, el trabajo corre en la API: %s", exc)
+        _olvidar_cola()
+        return None
 
 
 def encolar(funcion: Callable, *args, timeout: int = 900) -> Optional[str]:
@@ -60,10 +100,12 @@ def encolar(funcion: Callable, *args, timeout: int = 900) -> Optional[str]:
     que lo atienda, ejecuta directo.
     """
     cola = get_cola()
-    if cola is None or not hay_workers(cola):
-        funcion(*args)
-        return None
-    return cola.enqueue(funcion, *args, job_timeout=timeout).id
+    if cola is not None and hay_workers(cola):
+        id_trabajo = _enviar_a_la_cola(cola, funcion, args, timeout)
+        if id_trabajo is not None:
+            return id_trabajo
+    funcion(*args)
+    return None
 
 
 def despachar(
@@ -78,7 +120,9 @@ def despachar(
     respuesta sale primero y el trabajo corre después.
     """
     cola = get_cola()
-    if cola is None or not hay_workers(cola):
-        tareas.add_task(funcion, *args)
-        return None
-    return cola.enqueue(funcion, *args, job_timeout=timeout).id
+    if cola is not None and hay_workers(cola):
+        id_trabajo = _enviar_a_la_cola(cola, funcion, args, timeout)
+        if id_trabajo is not None:
+            return id_trabajo
+    tareas.add_task(funcion, *args)
+    return None

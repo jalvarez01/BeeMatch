@@ -15,6 +15,7 @@ export default function Candidato() {
   const [error, setError] = useState('')
   // HU-21: null mientras se consulta al repositorio.
   const [hoja, setHoja] = useState<DisponibilidadHojaVida | null>(null)
+  const [avisoPreseleccion, setAvisoPreseleccion] = useState('')
 
   useEffect(() => {
     obtenerRecomendacion(recomendacionId)
@@ -45,10 +46,22 @@ export default function Candidato() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recomendacionId, candidato?.id])
 
+  // HU-24: igual que en Resultados, cambia al instante y se revierte si falla.
   const alternar = async () => {
     if (!candidato) return
-    const actualizado = await marcarPreseleccion(candidato.id, !candidato.preseleccionado)
-    setCandidato({ ...candidato, preseleccionado: actualizado.preseleccionado })
+    const valor = !candidato.preseleccionado
+    const fijar = (preseleccionado: boolean) =>
+      setCandidato((previo) => (previo ? { ...previo, preseleccionado } : previo))
+
+    setAvisoPreseleccion('')
+    fijar(valor)
+    try {
+      const actualizado = await marcarPreseleccion(candidato.id, valor)
+      fijar(actualizado.preseleccionado)
+    } catch (e) {
+      fijar(!valor)
+      setAvisoPreseleccion(`No se pudo guardar la preselección. ${(e as Error).message}`)
+    }
   }
 
   if (error) return <div className="bm-alert bm-alert-error">{error}</div>
@@ -134,6 +147,12 @@ export default function Candidato() {
           )}
         </div>
       </div>
+
+      {avisoPreseleccion && (
+        <div className="bm-alert bm-alert-error" role="alert" style={{ marginTop: 16 }}>
+          {avisoPreseleccion}
+        </div>
+      )}
 
       {hoja?.mensaje && (
         <div

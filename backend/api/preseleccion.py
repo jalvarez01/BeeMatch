@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from backend.domain.services.bitacora_service import ACCION_EXPORTACION, BitacoraService
@@ -30,9 +30,7 @@ def exportar(
     try:
         archivo = ExportService(db).exportar(busqueda_id, datos.formato)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     BitacoraService(db).registrar(
         ACCION_EXPORTACION,
@@ -41,4 +39,8 @@ def exportar(
         entidad_id=busqueda_id,
         detalle=datos.formato,
     )
-    return FileResponse(archivo, filename=archivo.name)
+    return Response(
+        content=archivo.contenido,
+        media_type=archivo.tipo,
+        headers={"Content-Disposition": f'attachment; filename="{archivo.nombre}"'},
+    )

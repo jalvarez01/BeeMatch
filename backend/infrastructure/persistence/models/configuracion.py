@@ -73,7 +73,10 @@ class RegistroBitacoraModel(Base):
     __tablename__ = "bitacora"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=nuevo_id)
-    usuario_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    usuario_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    # Rol que tenía el usuario al momento del evento: si luego cambia de rol, el
+    # registro conserva el que tenía entonces. Es nulo en los eventos anteriores a HU-06.
+    rol: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     accion: Mapped[str] = mapped_column(String(60), index=True)
     entidad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     entidad_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)

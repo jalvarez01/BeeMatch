@@ -1,7 +1,10 @@
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Query, Session
 
+from backend.infrastructure.persistence.models.busqueda import BusquedaModel
+from backend.infrastructure.persistence.models.cliente import ClienteModel, ProyectoModel
 from backend.infrastructure.persistence.models.solicitud import CriterioModel, SolicitudModel
 
 
@@ -36,31 +39,99 @@ class SolicitudRepository:
         self.db.refresh(solicitud)
         return solicitud
 
+    def eliminar_borrador(self, solicitud: SolicitudModel) -> None:
+        """Elimina una solicitud en borrador y sus criterios sin tocar el historial."""
+        tiene_busquedas = (
+            self.db.query(BusquedaModel.id)
+            .filter(BusquedaModel.solicitud_id == solicitud.id)
+            .first()
+        )
+        if tiene_busquedas:
+            raise ValueError("La solicitud tiene búsquedas asociadas y no se puede eliminar.")
+
+        try:
+            self.db.query(CriterioModel).filter(
+                CriterioModel.solicitud_id == solicitud.id
+            ).delete(synchronize_session=False)
+            self.db.delete(solicitud)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def reemplazar(self, solicitud: SolicitudModel, **campos) -> SolicitudModel:
+        """
+        Fija los campos tal cual vienen, también los nulos (HU-15). `actualizar`
+        ignora los nulos y por eso no permite quitar, por ejemplo, la experiencia mínima.
+        """
+        for clave, valor in campos.items():
+            if hasattr(solicitud, clave):
+                setattr(solicitud, clave, valor)
+        self.db.commit()
+        self.db.refresh(solicitud)
+        return solicitud
+
+    def asociar_cliente(
+        self, solicitud: SolicitudModel, cliente_id: Optional[str], proyecto_id: Optional[str]
+    ) -> SolicitudModel:
+        """
+        Fija cliente y proyecto tal cual vienen (HU-12). `actualizar` ignora los
+        valores nulos, así que no sirve para quitar el proyecto.
+        """
+        solicitud.cliente_id = cliente_id
+        solicitud.proyecto_id = proyecto_id
+        self.db.commit()
+        self.db.refresh(solicitud)
+        return solicitud
+
+    def _filtrada(
+        self,
+        estado: Optional[str] = None,
+        texto: Optional[str] = None,
+        cliente_id: Optional[str] = None,
+    ) -> Query:
+        consulta = self.db.query(SolicitudModel)
+        if estado:
+            consulta = consulta.filter(SolicitudModel.estado == estado)
+        if cliente_id:
+            consulta = consulta.filter(SolicitudModel.cliente_id == cliente_id)
+        if texto:
+            # HU-12: el texto busca por rol, cliente o proyecto, como promete el buscador.
+            patron = f"%{texto.strip().lower()}%"
+            ids_cliente = select(ClienteModel.id).where(ClienteModel.nombre.ilike(patron))
+            ids_proyecto = select(ProyectoModel.id).where(ProyectoModel.nombre.ilike(patron))
+            consulta = consulta.filter(
+                or_(
+                    SolicitudModel.rol_buscado.ilike(patron),
+                    SolicitudModel.cliente_id.in_(ids_cliente),
+                    SolicitudModel.proyecto_id.in_(ids_proyecto),
+                )
+            )
+        return consulta
+
     def listar(
         self,
         estado: Optional[str] = None,
         texto: Optional[str] = None,
         limite: int = 20,
         desplazamiento: int = 0,
+        cliente_id: Optional[str] = None,
     ) -> list[SolicitudModel]:
-        consulta = self.db.query(SolicitudModel)
-        if estado:
-            consulta = consulta.filter(SolicitudModel.estado == estado)
-        if texto:
-            patron = f"%{texto.lower()}%"
-            consulta = consulta.filter(SolicitudModel.rol_buscado.ilike(patron))
         return (
-            consulta.order_by(SolicitudModel.created_at.desc())
+            self._filtrada(estado, texto, cliente_id)
+            .order_by(SolicitudModel.created_at.desc())
             .offset(desplazamiento)
             .limit(limite)
             .all()
         )
 
-    def contar(self, estado: Optional[str] = None) -> int:
-        consulta = self.db.query(SolicitudModel)
-        if estado:
-            consulta = consulta.filter(SolicitudModel.estado == estado)
-        return consulta.count()
+    def contar(
+        self,
+        estado: Optional[str] = None,
+        texto: Optional[str] = None,
+        cliente_id: Optional[str] = None,
+    ) -> int:
+        return self._filtrada(estado, texto, cliente_id).count()
 
     # --- Criterios -----------------------------------------------------------
 

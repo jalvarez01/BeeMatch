@@ -8,6 +8,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.pem
 *.key
 secrets/
@@ -113,3 +114,6 @@ beematch-credenciales.json
 # Notas de trabajo de cada quien, no del proyecto. Ya se subió por accidente dos
 # veces (a4b9e5d y 4e0b1b6); la regla es para que no vuelva a pasar.
 CLAUDE.md
+
+# Respaldos de la base generados por scripts/aws/respaldar.sh
+respaldos/

@@ -22,7 +22,11 @@ from backend.domain.matching.reranker import Reranker
 from backend.domain.services.busqueda_service import BusquedaService
 from backend.infrastructure.llm.llm_provider import RespuestaIA
 from backend.infrastructure.llm.prompts import SYSTEM_RERANK
-from backend.infrastructure.persistence.models.hoja_vida import CandidatoModel, HojaDeVidaModel
+from backend.infrastructure.persistence.models.hoja_vida import (
+    CandidatoModel,
+    FragmentoCVModel,
+    HojaDeVidaModel,
+)
 from backend.infrastructure.persistence.models.solicitud import SolicitudModel
 from backend.infrastructure.persistence.repositories.busqueda_repo import BusquedaRepository
 
@@ -92,6 +96,8 @@ def test_hu19_criterio1_y_3_el_detalle_incluye_la_explicacion_y_lo_no_evidenciad
     hoja = HojaDeVidaModel(id_documento="doc-1", nombre_archivo="cv.pdf", formato="PDF")
     db.add(hoja)
     db.commit()
+    # La coincidencia cita el fragmento "f-1": en PostgreSQL debe existir.
+    db.add(FragmentoCVModel(id="f-1", hoja_de_vida_id=hoja.id, texto="Desarrolladora Java con Spring Boot"))
     candidato = CandidatoModel(hoja_de_vida_id=hoja.id, nombre="Candidata de prueba")
     solicitud = SolicitudModel(descripcion_libre="Backend Java", rol_buscado="Backend", usuario_id=usuario.id)
     db.add_all([candidato, solicitud])
