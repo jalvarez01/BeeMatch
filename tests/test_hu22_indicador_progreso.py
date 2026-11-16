@@ -60,7 +60,10 @@ def api(monkeypatch):
     db = sessionmaker(bind=motor)()
 
     usuario = UsuarioModel(
-        nombre="Reclutador", correo="reclutador@bee.com.co", password_hash="x", rol="COORDINADOR"
+        nombre="Reclutador",
+        correo="reclutador.prueba@beeconsultoria.com",
+        password_hash="x",
+        rol="COORDINADOR",
     )
     db.add(usuario)
     db.commit()

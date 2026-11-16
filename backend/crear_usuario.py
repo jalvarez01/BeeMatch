@@ -7,7 +7,7 @@ administrador inicial no hay forma de crear a los demás desde la aplicación.
 También acepta los datos por argumentos, útil para automatizar:
 
     python -m backend.crear_usuario --nombre "Dyanna" \
-        --correo dyanna@bee.com.co --rol ADMINISTRADOR --password "Bee2026seguro"
+        --correo dyanna.tabares@beeconsultoria.com --rol ADMINISTRADOR --password "Bee2026seguro"
 
 La contraseña nunca se guarda en claro: se almacena su hash PBKDF2-SHA256.
 """

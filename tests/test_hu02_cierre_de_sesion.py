@@ -16,8 +16,8 @@ from backend.infrastructure.persistence.models.configuracion import RegistroBita
 
 
 def test_hu02_el_cierre_de_sesion_queda_en_la_bitacora(cliente, crear_usuario, entrar, db):
-    crear_usuario("ana@bee.com.co")
-    cabeceras = entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    cabeceras = entrar("ana.prueba@beeconsultoria.com")
 
     assert cliente.post("/auth/logout", headers=cabeceras).status_code == 204
 
@@ -26,8 +26,8 @@ def test_hu02_el_cierre_de_sesion_queda_en_la_bitacora(cliente, crear_usuario, e
 
 
 def test_hu02_criterio4_la_sesion_dura_treinta_minutos(cliente, crear_usuario, entrar):
-    crear_usuario("ana@bee.com.co")
-    token = entrar("ana@bee.com.co")["Authorization"].split()[1]
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    token = entrar("ana.prueba@beeconsultoria.com")["Authorization"].split()[1]
 
     datos = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     duracion = datetime.fromtimestamp(datos["exp"], UTC) - datetime.fromtimestamp(datos["iat"], UTC)
@@ -39,7 +39,7 @@ def test_hu02_criterio4_la_sesion_dura_treinta_minutos(cliente, crear_usuario, e
 def test_hu02_criterio4_un_token_inactivo_mas_de_treinta_minutos_se_rechaza(
     cliente, crear_usuario
 ):
-    usuario = crear_usuario("ana@bee.com.co")
+    usuario = crear_usuario("ana.prueba@beeconsultoria.com")
     hace_una_hora = datetime.now(UTC) - timedelta(hours=1)
     vencido = jwt.encode(
         {
@@ -60,8 +60,8 @@ def test_hu02_criterio4_un_token_inactivo_mas_de_treinta_minutos_se_rechaza(
 def test_hu02_criterio4_renovar_entrega_un_token_valido_y_alarga_la_sesion(
     cliente, crear_usuario, entrar
 ):
-    crear_usuario("ana@bee.com.co")
-    cabeceras = entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    cabeceras = entrar("ana.prueba@beeconsultoria.com")
 
     respuesta = cliente.post("/auth/renovar", headers=cabeceras)
 
@@ -75,8 +75,8 @@ def test_hu02_renovar_exige_sesion(cliente):
 
 
 def test_hu02_una_cuenta_inactivada_no_puede_renovar(cliente, crear_usuario, entrar, db):
-    usuario = crear_usuario("ana@bee.com.co")
-    cabeceras = entrar("ana@bee.com.co")
+    usuario = crear_usuario("ana.prueba@beeconsultoria.com")
+    cabeceras = entrar("ana.prueba@beeconsultoria.com")
     usuario.activo = False
     db.commit()
 

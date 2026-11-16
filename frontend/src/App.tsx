@@ -3,13 +3,13 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import Bitacora from './pages/Bitacora'
 import Candidato from './pages/Candidato'
+import CambiarPassword from './pages/CambiarPassword'
 import Candidatos from './pages/Candidatos'
 import Configuracion from './pages/Configuracion'
 import Dashboard from './pages/Dashboard'
 import Historial from './pages/Historial'
 import Login from './pages/Login'
 import NuevaBusqueda from './pages/NuevaBusqueda'
-import Registro from './pages/Registro'
 import Resultados from './pages/Resultados'
 import Solicitudes from './pages/Solicitudes'
 import Usuarios from './pages/Usuarios'
@@ -18,7 +18,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/registro" element={<Registro />} />
 
       <Route element={<Layout />}>
         <Route path="/inicio" element={<Dashboard />} />
@@ -31,6 +30,7 @@ export default function App() {
         <Route path="/resultados/:busquedaId" element={<Resultados />} />
         <Route path="/candidato/:recomendacionId" element={<Candidato />} />
         <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="/cambiar-password" element={<CambiarPassword />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/inicio" replace />} />

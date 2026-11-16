@@ -20,6 +20,12 @@ def _en_utc(momento: Optional[datetime]) -> Optional[datetime]:
     return momento
 
 
+
+def _nombre_sin_cuenta(registro) -> Optional[str]:
+    """Un evento de alguien cuya cuenta se borró no es lo mismo que uno del sistema."""
+    return "Usuario eliminado" if registro.usuario_id else None
+
+
 class RepositorioConfigRepository:
     """
     Acceso a la configuración del origen de hojas de vida (HU-05).
@@ -211,7 +217,7 @@ class BitacoraRepository:
                 "id": registro.id,
                 "created_at": _en_utc(registro.created_at),
                 "usuario_id": registro.usuario_id,
-                "usuario_nombre": usuario.nombre if usuario else None,
+                "usuario_nombre": usuario.nombre if usuario else _nombre_sin_cuenta(registro),
                 "usuario_correo": usuario.correo if usuario else None,
                 "rol": registro.rol or (usuario.rol if usuario else None),
                 "accion": registro.accion,

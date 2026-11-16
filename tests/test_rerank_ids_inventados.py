@@ -191,7 +191,7 @@ def _usuario(db) -> str:
 
     usuario = UsuarioModel(
         nombre="Prueba",
-        correo="prueba@bee.com.co",
+        correo="prueba.prueba@beeconsultoria.com",
         password_hash=hashear_password("x" * 12),
         rol=ROL_COORDINADOR,
     )

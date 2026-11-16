@@ -89,6 +89,8 @@ class PreseleccionModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=nuevo_id)
     busqueda_id: Mapped[str] = mapped_column(String(36), ForeignKey("busquedas.id"), index=True)
-    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("usuarios.id"))
+    usuario_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("usuarios.id"), nullable=True
+    )
     formato_exportacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

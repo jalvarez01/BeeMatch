@@ -11,7 +11,7 @@ from tests.conftest import CLAVE_DE_PRUEBA
 
 NUEVO = {
     "nombre": "Marta Ríos",
-    "correo": "marta@bee.com.co",
+    "correo": "marta.prueba@beeconsultoria.com",
     "password": "Segura1234",
     "rol": "COORDINADOR",
 }
@@ -19,12 +19,12 @@ NUEVO = {
 
 @pytest.fixture
 def diana(crear_usuario):
-    return crear_usuario("diana@bee.com.co", rol="SUPERADMINISTRADOR", nombre="Diana")
+    return crear_usuario("diana.prueba@beeconsultoria.com", rol="SUPERADMINISTRADOR", nombre="Diana")
 
 
 @pytest.fixture
 def admin(crear_usuario):
-    return crear_usuario("admin@bee.com.co", rol="ADMINISTRADOR")
+    return crear_usuario("admin.prueba@beeconsultoria.com", rol="ADMINISTRADOR")
 
 
 def test_hu03_criterio1_el_administrador_registra_usuario_con_nombre_correo_y_rol(
@@ -36,7 +36,7 @@ def test_hu03_criterio1_el_administrador_registra_usuario_con_nombre_correo_y_ro
     creado = respuesta.json()
     assert (creado["nombre"], creado["correo"], creado["rol"]) == (
         "Marta Ríos",
-        "marta@bee.com.co",
+        "marta.prueba@beeconsultoria.com",
         "COORDINADOR",
     )
 
@@ -56,7 +56,7 @@ def test_hu03_criterio3_inactivar_impide_el_acceso_y_conserva_el_historial(
 ):
     from backend.infrastructure.persistence.models.usuario import UsuarioModel
 
-    objetivo = crear_usuario("marta@bee.com.co")
+    objetivo = crear_usuario("marta.prueba@beeconsultoria.com")
     cabeceras_marta = entrar(objetivo.correo)  # genera su registro de LOGIN en la bitácora
 
     respuesta = cliente.patch(
@@ -78,7 +78,7 @@ def test_hu03_criterio3_inactivar_impide_el_acceso_y_conserva_el_historial(
 
 
 def test_hu03_criterio4_correo_duplicado_muestra_mensaje(cliente, admin, crear_usuario, entrar):
-    crear_usuario("marta@bee.com.co")
+    crear_usuario("marta.prueba@beeconsultoria.com")
 
     respuesta = cliente.post("/auth/usuarios", json=NUEVO, headers=entrar(admin.correo))
 
@@ -97,81 +97,11 @@ def test_hu03_criterio5_coordinador_y_director_no_acceden_a_la_gestion(
     assert cliente.post("/auth/usuarios", json=NUEVO, headers=cabeceras).status_code == 403
 
 
-# --- Autorregistro -----------------------------------------------------------
-
-
-def test_hu03_autorregistro_deja_la_cuenta_pendiente_sin_acceso(cliente):
-    respuesta = cliente.post(
-        "/auth/registro",
-        json={"nombre": "Pedro Gil", "correo": "pedro@bee.com.co", "password": "Segura1234"},
-    )
-
-    assert respuesta.status_code == 201
-    assert (respuesta.json()["pendiente"], respuesta.json()["activo"]) == (True, False)
-
-    intento = cliente.post(
-        "/auth/login", json={"correo": "pedro@bee.com.co", "password": "Segura1234"}
-    )
-    assert intento.status_code == 403
-    assert "pendiente de aprobación" in intento.json()["detail"]
-
-
-def test_hu03_autorregistro_rechaza_correos_ajenos_a_la_empresa(cliente):
-    respuesta = cliente.post(
-        "/auth/registro",
-        json={"nombre": "Pedro Gil", "correo": "pedro@gmail.com", "password": "Segura1234"},
-    )
-
-    assert respuesta.status_code == 422
-
-
-def test_hu03_autorregistro_con_correo_repetido_avisa_duplicado(cliente, crear_usuario):
-    crear_usuario("pedro@bee.com.co")
-
-    respuesta = cliente.post(
-        "/auth/registro",
-        json={"nombre": "Pedro Gil", "correo": "pedro@bee.com.co", "password": "Segura1234"},
-    )
-
-    assert respuesta.status_code == 409
-
-
-def test_hu03_un_administrador_aprueba_un_registro_y_asigna_el_rol(
-    cliente, admin, entrar
-):
-    cliente.post(
-        "/auth/registro",
-        json={"nombre": "Pedro Gil", "correo": "pedro@bee.com.co", "password": "Segura1234"},
-    )
-    pedro = next(
-        u for u in cliente.get("/auth/usuarios", headers=entrar(admin.correo)).json()
-        if u["correo"] == "pedro@bee.com.co"
-    )
-
-    aprobado = cliente.patch(
-        f"/auth/usuarios/{pedro['id']}",
-        json={"activo": True, "rol": "DIRECTOR"},
-        headers=entrar(admin.correo),
-    )
-
-    assert (aprobado.json()["activo"], aprobado.json()["pendiente"], aprobado.json()["rol"]) == (
-        True,
-        False,
-        "DIRECTOR",
-    )
-    assert (
-        cliente.post(
-            "/auth/login", json={"correo": "pedro@bee.com.co", "password": "Segura1234"}
-        ).status_code
-        == 200
-    )
-
-
 # --- Jerarquía de la superusuaria -------------------------------------------
 
 
 def test_hu03_la_superusuaria_nombra_administradores(cliente, diana, crear_usuario, entrar):
-    objetivo = crear_usuario("luis@bee.com.co")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
 
     respuesta = cliente.patch(
         f"/auth/usuarios/{objetivo.id}", json={"rol": "ADMINISTRADOR"}, headers=entrar(diana.correo)
@@ -213,7 +143,7 @@ def test_hu03_ni_la_propia_superusuaria_puede_degradarse_o_inactivarse(cliente, 
 def test_hu03_un_administrador_no_revoca_a_otro_administrador(
     cliente, admin, crear_usuario, entrar
 ):
-    otro = crear_usuario("otro@bee.com.co", rol="ADMINISTRADOR")
+    otro = crear_usuario("otro.prueba@beeconsultoria.com", rol="ADMINISTRADOR")
 
     respuesta = cliente.patch(
         f"/auth/usuarios/{otro.id}", json={"activo": False}, headers=entrar(admin.correo)
@@ -225,7 +155,7 @@ def test_hu03_un_administrador_no_revoca_a_otro_administrador(
 def test_hu03_un_administrador_no_otorga_el_rol_de_administrador(
     cliente, admin, crear_usuario, entrar
 ):
-    objetivo = crear_usuario("luis@bee.com.co")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
     cabeceras = entrar(admin.correo)
 
     editar = cliente.patch(
@@ -239,7 +169,7 @@ def test_hu03_un_administrador_no_otorga_el_rol_de_administrador(
 def test_hu03_el_rol_superadministrador_no_se_asigna_por_la_api(
     cliente, diana, crear_usuario, entrar
 ):
-    objetivo = crear_usuario("luis@bee.com.co")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
     cabeceras = entrar(diana.correo)
 
     editar = cliente.patch(
@@ -262,29 +192,29 @@ def test_hu03_la_superusuaria_conserva_todos_los_permisos_de_administrador(
 
 
 def test_hu03_se_puede_editar_nombre_y_correo(cliente, admin, crear_usuario, entrar):
-    objetivo = crear_usuario("luis@bee.com.co")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
 
     respuesta = cliente.patch(
         f"/auth/usuarios/{objetivo.id}",
-        json={"nombre": "Luis Pérez", "correo": "lperez@bee.com.co"},
+        json={"nombre": "Luis Pérez", "correo": "lperez.prueba@beeconsultoria.com"},
         headers=entrar(admin.correo),
     )
 
     assert (respuesta.json()["nombre"], respuesta.json()["correo"]) == (
         "Luis Pérez",
-        "lperez@bee.com.co",
+        "lperez.prueba@beeconsultoria.com",
     )
 
 
 def test_hu03_editar_a_un_correo_ya_usado_avisa_duplicado(
     cliente, admin, crear_usuario, entrar
 ):
-    objetivo = crear_usuario("luis@bee.com.co")
-    crear_usuario("marta@bee.com.co")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
+    crear_usuario("marta.prueba@beeconsultoria.com")
 
     respuesta = cliente.patch(
         f"/auth/usuarios/{objetivo.id}",
-        json={"correo": "marta@bee.com.co"},
+        json={"correo": "marta.prueba@beeconsultoria.com"},
         headers=entrar(admin.correo),
     )
 

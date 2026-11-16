@@ -50,8 +50,8 @@ CRITERIOS_COMPLETOS = [
 
 @pytest.fixture
 def cabeceras(crear_usuario, entrar):
-    crear_usuario("coordinadora@bee.com.co")
-    return entrar("coordinadora@bee.com.co")
+    crear_usuario("coordinadora.prueba@beeconsultoria.com")
+    return entrar("coordinadora.prueba@beeconsultoria.com")
 
 
 @pytest.fixture
@@ -250,9 +250,9 @@ def test_hu09_criterio4_el_historial_muestra_los_criterios_de_cada_solicitud(
 ):
     solicitud = _registrar(cliente, cabeceras)
     # HU-04: el historial completo lo consultan Director y Administrador.
-    crear_usuario("director@bee.com.co", rol="DIRECTOR")
+    crear_usuario("director.prueba@beeconsultoria.com", rol="DIRECTOR")
 
-    respuesta = cliente.get("/solicitudes/", headers=entrar("director@bee.com.co"))
+    respuesta = cliente.get("/solicitudes/", headers=entrar("director.prueba@beeconsultoria.com"))
 
     assert respuesta.status_code == 200, respuesta.text
     fila = next(s for s in respuesta.json()["solicitudes"] if s["id"] == solicitud["id"])

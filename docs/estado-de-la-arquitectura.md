@@ -66,7 +66,7 @@ Leyenda: **Hecho** = existe y está probado · **Cambió** = se hizo distinto al
 
 ## Decisiones abiertas
 
-1. **Inicio de sesión corporativo con Entra ID (C2, C5, E2).** No es trabajo de infraestructura sino de producto: los Sprints 1 a 3 implementaron autenticación local (HU-01 a HU-03, dominio `@bee.com.co`, bloqueo tras 5 intentos) y no se ha pedido migrarla. Hacerlo exige un *tenant* de Microsoft con permisos para registrar la aplicación, al que el equipo no tiene acceso; sin él no se puede probar. Si se decide, el punto de entrada ya está previsto (`id_entra`, `password_hash` nulo para usuarios federados).
+1. **Inicio de sesión corporativo con Entra ID (C2, C5, E2).** No es trabajo de infraestructura sino de producto: los Sprints 1 a 3 implementaron autenticación local (HU-01 a HU-03, dominio `@beeconsultoria.com`, bloqueo tras 5 intentos) y no se ha pedido migrarla. Hacerlo exige un *tenant* de Microsoft con permisos para registrar la aplicación, al que el equipo no tiene acceso; sin él no se puede probar. Si se decide, el punto de entrada ya está previsto (`id_entra`, `password_hash` nulo para usuarios federados).
 2. **Despliegue continuo.** Hoy es manual (`desplegar.sh`). Automatizarlo exige guardar una llave SSH como secreto del repositorio; se pospone hasta que el despliegue manual deje de ser razonable.
 3. **Métricas.** Si se quieren paneles de latencia y costo de tokens, la opción más barata es exportar desde la tabla `busquedas` (ya guarda duración, modelo y tokens por ejecución).
 4. **PostgreSQL gestionado.** Con Compose la base vive en la misma instancia. Si el proyecto sigue más allá del semestre, pasar a RDS es cambiar `DATABASE_URL` y restaurar un respaldo (ver `despliegue-aws.md`).

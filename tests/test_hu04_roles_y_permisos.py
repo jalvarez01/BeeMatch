@@ -20,7 +20,7 @@ from backend.infrastructure.persistence.models.solicitud import SolicitudModel
 @pytest.fixture
 def escenario(db, crear_usuario):
     """Una solicitud de Ana (Coordinadora) con su búsqueda y una recomendación."""
-    ana = crear_usuario("ana@bee.com.co", rol="COORDINADOR")
+    ana = crear_usuario("ana.prueba@beeconsultoria.com", rol="COORDINADOR")
     solicitud = SolicitudModel(
         descripcion_libre="Desarrollador backend con Java y Spring Boot.",
         rol_buscado="Backend",
@@ -71,7 +71,7 @@ def _llamar(cliente, metodo, ruta, cabeceras):
 def test_hu04_un_coordinador_no_ve_los_resultados_de_otro(
     cliente, escenario, crear_usuario, entrar
 ):
-    otro = crear_usuario("luis@bee.com.co", rol="COORDINADOR")
+    otro = crear_usuario("luis.prueba@beeconsultoria.com", rol="COORDINADOR")
     cabeceras = entrar(otro.correo)
 
     for metodo, ruta in _rutas_de_la_busqueda(escenario):
@@ -114,7 +114,7 @@ def test_hu04_los_roles_con_vista_del_area_ven_resultados_ajenos(
 def test_hu04_la_superusuaria_abre_solicitudes_ajenas(
     cliente, escenario, crear_usuario, entrar
 ):
-    diana = crear_usuario("diana@bee.com.co", rol="SUPERADMINISTRADOR")
+    diana = crear_usuario("diana.prueba@beeconsultoria.com", rol="SUPERADMINISTRADOR")
 
     respuesta = cliente.get(
         f"/solicitudes/{escenario['solicitud'].id}", headers=entrar(diana.correo)
@@ -124,7 +124,7 @@ def test_hu04_la_superusuaria_abre_solicitudes_ajenas(
 
 
 def test_hu04_una_busqueda_inexistente_sigue_siendo_404(cliente, crear_usuario, entrar):
-    usuario = crear_usuario("ana@bee.com.co")
+    usuario = crear_usuario("ana.prueba@beeconsultoria.com")
 
     respuesta = cliente.get("/busquedas/no-existe", headers=entrar(usuario.correo))
 
@@ -137,8 +137,8 @@ def test_hu04_una_busqueda_inexistente_sigue_siendo_404(cliente, crear_usuario, 
 def test_hu04_criterio2_al_renovar_la_sesion_llega_el_rol_nuevo(
     cliente, crear_usuario, entrar, db
 ):
-    diana = crear_usuario("diana@bee.com.co", rol="SUPERADMINISTRADOR")
-    admin = crear_usuario("admin@bee.com.co", rol="ADMINISTRADOR")
+    diana = crear_usuario("diana.prueba@beeconsultoria.com", rol="SUPERADMINISTRADOR")
+    admin = crear_usuario("admin.prueba@beeconsultoria.com", rol="ADMINISTRADOR")
     cabeceras_admin = entrar(admin.correo)
 
     cliente.patch(
@@ -166,8 +166,8 @@ def test_hu04_duplicar_una_solicitud_responde_201(cliente, escenario, entrar):
 
 
 def test_hu03_el_correo_debe_ser_del_dominio_corporativo(cliente, crear_usuario, entrar):
-    admin = crear_usuario("admin@bee.com.co", rol="ADMINISTRADOR")
-    objetivo = crear_usuario("luis@bee.com.co")
+    admin = crear_usuario("admin.prueba@beeconsultoria.com", rol="ADMINISTRADOR")
+    objetivo = crear_usuario("luis.prueba@beeconsultoria.com")
     cabeceras = entrar(admin.correo)
 
     crear = cliente.post(

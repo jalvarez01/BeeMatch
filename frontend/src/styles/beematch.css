@@ -69,6 +69,7 @@
 .bm-user { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .bm-user b { font-weight: 600; }
 .bm-user span { color: var(--muted-2); }
+.bm-link { color: var(--muted); font-size: 12px; text-decoration: underline; }
 .bm-avatar {
   width: 28px; height: 28px; border-radius: 50%; background: #E9E9EB;
   display: grid; place-items: center; color: var(--muted);

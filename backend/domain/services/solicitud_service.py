@@ -114,9 +114,15 @@ class SolicitudService:
             cliente_id=cliente_id,
             proyecto_id=proyecto_id,
             usuario_id=usuario_id,
+            autor_nombre=self._nombre_de(usuario_id),
         )
         self.repo.reemplazar_criterios(solicitud.id, [c.model_dump() for c in datos.criterios])
         return self._enriquecer(solicitud)
+
+    def _nombre_de(self, usuario_id: str) -> Optional[str]:
+        """Nombre de quien crea la solicitud: queda guardado aunque su cuenta se borre."""
+        usuario = self.usuarios.get_by_id(usuario_id)
+        return usuario.nombre if usuario else None
 
     def actualizar(self, solicitud_id: str, datos: SolicitudUpdate) -> Optional[SolicitudResponse]:
         """
@@ -175,6 +181,7 @@ class SolicitudService:
             cliente_id=original.cliente_id,
             proyecto_id=original.proyecto_id,
             usuario_id=usuario_id,
+            autor_nombre=self._nombre_de(usuario_id),
         )
         criterios = [
             {"tipo": c.tipo, "valor": c.valor, "obligatorio": c.obligatorio, "peso": c.peso}
@@ -268,8 +275,10 @@ class SolicitudService:
             proyecto = self.proyectos.get_by_id(solicitud.proyecto_id)
             respuesta.proyecto_nombre = proyecto.nombre if proyecto else None
 
-        usuario = self.usuarios.get_by_id(solicitud.usuario_id)
-        respuesta.usuario_nombre = usuario.nombre if usuario else None
+        # Si la cuenta ya no existe, el historial conserva el nombre de su autor.
+        usuario = self.usuarios.get_by_id(solicitud.usuario_id) if solicitud.usuario_id else None
+        respuesta.usuario_nombre = usuario.nombre if usuario else solicitud.autor_nombre
+        respuesta.usuario_eliminado = usuario is None
 
         respuesta.total_ejecuciones = self.busquedas.contar_de_solicitud(solicitud.id)
 

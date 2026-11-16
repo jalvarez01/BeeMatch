@@ -19,6 +19,7 @@ const TITULOS: Record<string, string> = {
   '/configuracion': 'Configuración',
   '/usuarios': 'Usuarios',
   '/bitacora': 'Bitácora',
+  '/cambiar-password': 'Cambiar contraseña',
 }
 
 const RUTAS_POR_ROL: Record<Rol, string[]> = {
@@ -51,6 +52,8 @@ const RUTAS_POR_ROL: Record<Rol, string[]> = {
     '/configuracion',
   ],
 }
+
+const RUTA_CAMBIAR_PASSWORD = '/cambiar-password'
 
 function tituloDe(ruta: string): string {
   const coincidencia = Object.keys(TITULOS).find((t) => ruta.startsWith(t))
@@ -97,8 +100,11 @@ export default function Layout() {
   }, [irAlLogin])
 
   const rol = sesion?.usuario?.rol
+  const enCambioDeClave = ubicacion.pathname === RUTA_CAMBIAR_PASSWORD
+  // Todas las personas pueden cambiar su propia contraseña, sea cual sea su rol.
   const rutaPermitida = rol
-    ? RUTAS_POR_ROL[rol].some(
+    ? enCambioDeClave ||
+      RUTAS_POR_ROL[rol].some(
         (ruta) =>
           ubicacion.pathname === ruta ||
           ubicacion.pathname.startsWith(`${ruta}/`),
@@ -107,6 +113,11 @@ export default function Layout() {
 
   if (!sesion?.access_token || !rol) {
     return <Navigate to="/login" replace state={{ desde: ubicacion.pathname }} />
+  }
+
+  // La clave inicial la puso la superadministradora: se cambia antes de usar la aplicación.
+  if (sesion.usuario.debe_cambiar_password && !enCambioDeClave) {
+    return <Navigate to={RUTA_CAMBIAR_PASSWORD} replace />
   }
 
   if (!rutaPermitida) {

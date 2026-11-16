@@ -36,14 +36,14 @@ ROL = "Desarrollador Backend"
 
 @pytest.fixture
 def cabeceras(crear_usuario, entrar):
-    crear_usuario("ana@bee.com.co")
-    return entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    return entrar("ana.prueba@beeconsultoria.com")
 
 
 @pytest.fixture
 def cabeceras_director(crear_usuario, entrar):
-    crear_usuario("dario@bee.com.co", rol="DIRECTOR")
-    return entrar("dario@bee.com.co")
+    crear_usuario("dario.prueba@beeconsultoria.com", rol="DIRECTOR")
+    return entrar("dario.prueba@beeconsultoria.com")
 
 
 @pytest.fixture

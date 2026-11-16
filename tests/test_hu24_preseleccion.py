@@ -34,8 +34,8 @@ def busqueda(db):
 
 @pytest.fixture
 def cabeceras(crear_usuario, entrar):
-    crear_usuario("directora@bee.com.co", rol=ROL_DIRECTOR)
-    return entrar("directora@bee.com.co")
+    crear_usuario("directora.prueba@beeconsultoria.com", rol=ROL_DIRECTOR)
+    return entrar("directora.prueba@beeconsultoria.com")
 
 
 def _marcar(cliente, cabeceras, recomendacion_id: str, valor: bool):

@@ -27,8 +27,8 @@ class UsuarioModel(Base):
     rol: Mapped[str] = mapped_column(String(20), default="COORDINADOR")
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # HU-03: cuenta creada por autorregistro que espera la aprobación de la
-    # superusuaria. Se distingue de una cuenta inactiva (dada de baja).
+    # Marca de las cuentas que esperaban aprobación cuando existía el autorregistro.
+    # Ya no se crean así; se conserva por las bases que aún tengan alguna.
     pendiente: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Obliga a cambiar la contraseña sembrada en el primer ingreso.
