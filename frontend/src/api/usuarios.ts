@@ -14,7 +14,7 @@ export interface CambiosUsuario {
   nombre?: string
   correo?: string
   rol?: Exclude<Rol, 'SUPERADMINISTRADOR'>
-  /** `true` aprueba una cuenta pendiente o reactiva; `false` inactiva. */
+  /** `true` reactiva la cuenta; `false` la inactiva. */
   activo?: boolean
 }
 
@@ -39,4 +39,8 @@ export async function actualizarUsuario(
     method: 'PATCH',
     body: JSON.stringify(cambios),
   })
+}
+/** Borra el perfil. El historial de solicitudes de esa persona se conserva. */
+export async function eliminarUsuario(id: string): Promise<void> {
+  await apiFetch<boolean>(`/auth/usuarios/${id}`, { method: 'DELETE' })
 }

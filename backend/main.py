@@ -1,7 +1,8 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.api import (
     auth,
@@ -15,6 +16,7 @@ from backend.api import (
     solicitudes,
 )
 from backend.config import ALLOWED_ORIGINS, PLANIFICADOR_EN_API
+from backend.domain.services.solicitud_service import ClienteNoRegistradoError
 from backend.infrastructure.persistence import models  # noqa: F401  (registra las tablas)
 from backend.infrastructure.persistence.database import init_db
 from backend.logging_config import RegistroDePeticiones, configurar_logging, iniciar_sentry
@@ -29,6 +31,14 @@ app = FastAPI(
     description="Asistente inteligente de preselección de talento para Bee Consultoría y Negocios",
     version="0.1.0",
 )
+
+
+
+@app.exception_handler(ClienteNoRegistradoError)
+async def _cliente_no_registrado(_peticion: Request, error: ClienteNoRegistradoError):
+    """Un cliente que no está en el catálogo es un dato inválido de la solicitud."""
+    return JSONResponse(status_code=422, content={"detail": str(error)})
+
 
 app.add_middleware(RegistroDePeticiones)
 app.add_middleware(

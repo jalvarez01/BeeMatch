@@ -72,6 +72,8 @@ _COLUMNAS_NUEVAS = {
     "proyectos": {"nombre_normalizado": "VARCHAR(160)"},
     # HU-15: criterios, cliente y proyecto de cada ejecución.
     "busquedas": {"parametros_json": "TEXT"},
+    # Nombre de quien creó la solicitud, para conservarlo si se borra su cuenta.
+    "solicitudes": {"autor_nombre": "VARCHAR(160)"},
 }
 
 

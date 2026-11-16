@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { listarClientes } from '../api/clientes'
 import type { ClienteSugerido } from '../types'
 
-const ESPERA_MS = 250
+const MAXIMO = 100
 
 interface Props {
   id: string
@@ -14,118 +14,64 @@ interface Props {
 }
 
 /**
- * HU-12: campo de cliente con sugerencias. Al escribir las primeras letras ofrece los
- * clientes ya registrados; elegir uno evita duplicarlo. Si no hay coincidencia, lo
- * escrito se registra como cliente nuevo al guardar. Si las sugerencias fallan el
- * campo sigue funcionando como texto libre.
+ * HU-12: selector de cliente. Los clientes los registra la superadministradora y el
+ * resto de las personas elige uno de la lista; no se escribe uno nuevo. Si la solicitud
+ * ya tenía un cliente que dejó de estar en la lista, se conserva como opción para no
+ * perderlo al editarla.
  */
 export default function CampoCliente({ id, valor, onCambio, deshabilitado, atributosError }: Props) {
-  const [sugerencias, setSugerencias] = useState<ClienteSugerido[]>([])
-  const [abierto, setAbierto] = useState(false)
-  const [activa, setActiva] = useState(-1)
-  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const peticion = useRef<AbortController | null>(null)
+  const [clientes, setClientes] = useState<ClienteSugerido[]>([])
+  const [cargado, setCargado] = useState(false)
+  const [fallo, setFallo] = useState(false)
 
-  useEffect(
-    () => () => {
-      if (temporizador.current) clearTimeout(temporizador.current)
-      peticion.current?.abort()
-    },
-    [],
-  )
+  useEffect(() => {
+    const peticion = new AbortController()
+    listarClientes('', MAXIMO, peticion.signal)
+      .then((encontrados) => {
+        if (peticion.signal.aborted) return
+        setClientes(encontrados)
+        setCargado(true)
+      })
+      .catch(() => {
+        if (!peticion.signal.aborted) {
+          setFallo(true)
+          setCargado(true)
+        }
+      })
+    return () => peticion.abort()
+  }, [])
 
-  const buscar = (texto: string) => {
-    if (temporizador.current) clearTimeout(temporizador.current)
-    peticion.current?.abort()
-    if (!texto.trim()) {
-      setSugerencias([])
-      setAbierto(false)
-      return
-    }
-    temporizador.current = setTimeout(() => {
-      const actual = new AbortController()
-      peticion.current = actual
-      listarClientes(texto, 8, actual.signal)
-        .then((encontrados) => {
-          if (actual.signal.aborted) return
-          setSugerencias(encontrados)
-          setActiva(-1)
-          setAbierto(encontrados.length > 0)
-        })
-        .catch(() => {
-          if (!actual.signal.aborted) setAbierto(false)
-        })
-    }, ESPERA_MS)
-  }
-
-  const elegir = (cliente: ClienteSugerido) => {
-    onCambio(cliente.nombre)
-    setAbierto(false)
-    setSugerencias([])
-  }
-
-  const alPulsar = (evento: React.KeyboardEvent<HTMLInputElement>) => {
-    if (evento.key === 'Escape') {
-      setAbierto(false)
-      return
-    }
-    if (!abierto || sugerencias.length === 0) return
-    if (evento.key === 'ArrowDown') {
-      evento.preventDefault()
-      setActiva((i) => (i + 1) % sugerencias.length)
-    } else if (evento.key === 'ArrowUp') {
-      evento.preventDefault()
-      setActiva((i) => (i <= 0 ? sugerencias.length - 1 : i - 1))
-    } else if (evento.key === 'Enter' && activa >= 0) {
-      evento.preventDefault()
-      elegir(sugerencias[activa])
-    }
-  }
-
-  const idLista = `${id}-sugerencias`
+  const enLista = clientes.some((c) => c.nombre.toLowerCase() === valor.trim().toLowerCase())
+  const sinClientes = cargado && !fallo && clientes.length === 0
 
   return (
-    <div className="bm-suggest">
-      <input
+    <>
+      <select
         id={id}
-        autoComplete="off"
-        placeholder="Escribir o seleccionar cliente"
         value={valor}
-        disabled={deshabilitado}
-        role="combobox"
-        aria-expanded={abierto}
-        aria-controls={idLista}
-        aria-autocomplete="list"
+        disabled={deshabilitado || !cargado}
         aria-required="true"
-        aria-activedescendant={activa >= 0 ? `${id}-opcion-${activa}` : undefined}
-        onChange={(e) => {
-          onCambio(e.target.value)
-          buscar(e.target.value)
-        }}
-        onKeyDown={alPulsar}
-        onBlur={() => setAbierto(false)}
+        onChange={(e) => onCambio(e.target.value)}
         {...atributosError}
-      />
-      {abierto && (
-        <ul id={idLista} className="bm-suggest-list" role="listbox">
-          {sugerencias.map((cliente, i) => (
-            <li
-              key={cliente.id}
-              id={`${id}-opcion-${i}`}
-              role="option"
-              aria-selected={i === activa}
-              data-active={i === activa}
-              // mouseDown y no click: el blur del campo cierra la lista antes de que llegue el click.
-              onMouseDown={(e) => {
-                e.preventDefault()
-                elegir(cliente)
-              }}
-            >
-              {cliente.nombre}
-            </li>
-          ))}
-        </ul>
+      >
+        <option value="">{cargado ? 'Selecciona un cliente' : 'Cargando clientes…'}</option>
+        {valor.trim() && !enLista && <option value={valor}>{valor}</option>}
+        {clientes.map((cliente) => (
+          <option key={cliente.id} value={cliente.nombre}>
+            {cliente.nombre}
+          </option>
+        ))}
+      </select>
+      {sinClientes && (
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
+          Aún no hay clientes registrados. Pídele a la superadministradora que los registre.
+        </p>
       )}
-    </div>
+      {fallo && (
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0 0' }}>
+          No se pudo cargar la lista de clientes. Recarga la página.
+        </p>
+      )}
+    </>
   )
 }

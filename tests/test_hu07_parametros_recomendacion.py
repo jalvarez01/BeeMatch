@@ -29,8 +29,8 @@ RUTA = "/configuracion/recomendacion"
 
 @pytest.fixture
 def admin(crear_usuario, entrar):
-    crear_usuario("admin@bee.com.co", rol="ADMINISTRADOR")
-    return entrar("admin@bee.com.co")
+    crear_usuario("admin.prueba@beeconsultoria.com", rol="ADMINISTRADOR")
+    return entrar("admin.prueba@beeconsultoria.com")
 
 
 def _guardados(db) -> dict[str, str]:
@@ -181,8 +181,8 @@ def test_hu07_criterio3_el_servicio_no_escribe_nada_si_hay_un_error(db):
 
 @pytest.mark.parametrize("rol", ["DIRECTOR", "COORDINADOR"])
 def test_hu07_solo_el_administrador_configura_los_parametros(cliente, crear_usuario, entrar, db, rol):
-    crear_usuario("otro@bee.com.co", rol=rol)
-    cabeceras = entrar("otro@bee.com.co")
+    crear_usuario("otro.prueba@beeconsultoria.com", rol=rol)
+    cabeceras = entrar("otro.prueba@beeconsultoria.com")
 
     assert cliente.get(RUTA, headers=cabeceras).status_code == 403
     intento = cliente.put(RUTA, json={"num_candidatos": 9, "umbral_afinidad": 90}, headers=cabeceras)

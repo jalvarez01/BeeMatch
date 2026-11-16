@@ -103,8 +103,9 @@ JWT_EXPIRACION_MINUTOS = int(os.getenv("JWT_EXPIRACION_MINUTOS", "30"))
 LOGIN_MAX_INTENTOS = int(os.getenv("LOGIN_MAX_INTENTOS", "5"))
 LOGIN_BLOQUEO_MINUTOS = int(os.getenv("LOGIN_BLOQUEO_MINUTOS", "15"))
 
-# HU-03: el autorregistro solo acepta correos corporativos de este dominio.
-DOMINIO_CORREO = os.getenv("DOMINIO_CORREO", "bee.com.co").lower()
+# HU-03: las cuentas que crea la superadministradora solo aceptan correos de este
+# dominio, con la forma nombre.apellido@dominio.
+DOMINIO_CORREO = os.getenv("DOMINIO_CORREO", "beeconsultoria.com").lower()
 
 # HU-03: superusuaria (Diana). Si no existe ninguna al arrancar y el correo y la
 # contraseña están definidos, se crea con el rol SUPERADMINISTRADOR.

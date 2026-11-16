@@ -154,6 +154,8 @@ Y en el navegador, `http://<IP-elástica>`:
 
 - [ ] Carga la pantalla de inicio de sesión.
 - [ ] Entra con la superusuaria (`SUPERUSUARIO_CORREO` / `SUPERUSUARIO_PASSWORD`).
+- [ ] *Clientes*: registrar los clientes de Bee. Quien crea una solicitud solo puede elegir uno de esa lista.
+- [ ] *Usuarios*: crear las cuentas del equipo con correo `nombre.apellido@beeconsultoria.com` y una contraseña inicial. No hay autorregistro; cada persona cambia su contraseña al entrar y la superusuaria no puede verla.
 - [ ] *Configuración*: registrar el repositorio de hojas de vida y probar la conexión.
 - [ ] Lanzar la sincronización y esperar a que las hojas de vida pasen a *Indexada*.
 - [ ] Crear una solicitud y ejecutar una búsqueda: el indicador de progreso avanza y llega al Top 5.
@@ -260,3 +262,15 @@ Falta o conviene revisar:
 - La emisión del certificado HTTPS con un dominio real.
 - El rendimiento en una `t3.small`: las pruebas fueron en un portátil. Si la construcción o la API se quedan sin memoria, pasar a `t3.medium`.
 - Una búsqueda completa con OpenAI y el repositorio real dentro del contenedor (sin credenciales en el entorno de prueba).
+
+### Cambiar el correo de la superusuaria
+
+La siembra solo crea a la superusuaria cuando no existe ninguna; cambiar `SUPERUSUARIO_CORREO` después no la modifica. Para corregir su correo se actualiza la base. El respaldo va primero:
+
+```bash
+./scripts/aws/respaldar.sh
+docker compose -f docker-compose.prod.yml --env-file .env.production exec db psql -U beematch -d beematch -c \
+  "update usuarios set correo = 'nombre.apellido@beeconsultoria.com' where rol = 'SUPERADMINISTRADOR';"
+```
+
+Debe responder `UPDATE 1`. Después, la persona entra con el correo nuevo y la misma contraseña.

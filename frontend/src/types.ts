@@ -31,6 +31,8 @@ export interface Usuario {
   rol: Rol
   activo: boolean
   pendiente?: boolean
+  /** Cuenta con la clave inicial que puso la superadministradora: debe cambiarla. */
+  debe_cambiar_password?: boolean
 }
 
 export interface Sesion {
@@ -59,6 +61,8 @@ export interface Solicitud {
   cliente_nombre: string | null
   proyecto_nombre: string | null
   usuario_nombre: string | null
+  /** La persona que la creó ya no tiene cuenta; el nombre se conserva igual. */
+  usuario_eliminado?: boolean
   criterios: Criterio[]
   total_candidatos: number | null
   mejor_afinidad: number | null

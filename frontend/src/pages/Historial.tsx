@@ -186,6 +186,7 @@ export default function Historial() {
               />
               <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 6 }}>
                 {formatearFecha(solicitud.created_at)} · Creada por {solicitud.usuario_nombre}
+                {solicitud.usuario_eliminado ? ' (cuenta eliminada)' : ''}
               </div>
             </div>
 

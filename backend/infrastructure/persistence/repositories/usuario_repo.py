@@ -85,6 +85,27 @@ class UsuarioRepository:
         self.db.refresh(usuario)
         return usuario
 
+    def eliminar(self, usuario: UsuarioModel) -> None:
+        """
+        Borra la cuenta y conserva lo que hizo. Las solicitudes y preselecciones
+        quedan sin cuenta asociada, pero cada solicitud ya guarda el nombre de su
+        autor; si alguna no lo tenía, se completa antes de soltarla.
+        """
+        from backend.infrastructure.persistence.models.busqueda import PreseleccionModel
+        from backend.infrastructure.persistence.models.solicitud import SolicitudModel
+
+        self.db.query(SolicitudModel).filter(
+            SolicitudModel.usuario_id == usuario.id, SolicitudModel.autor_nombre.is_(None)
+        ).update({"autor_nombre": usuario.nombre}, synchronize_session=False)
+        self.db.query(SolicitudModel).filter(SolicitudModel.usuario_id == usuario.id).update(
+            {"usuario_id": None}, synchronize_session=False
+        )
+        self.db.query(PreseleccionModel).filter(PreseleccionModel.usuario_id == usuario.id).update(
+            {"usuario_id": None}, synchronize_session=False
+        )
+        self.db.delete(usuario)
+        self.db.commit()
+
     def marcar_acceso(self, usuario: UsuarioModel) -> None:
         usuario.ultimo_acceso = utcnow()
         self.db.commit()

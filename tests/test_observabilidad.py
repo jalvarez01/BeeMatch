@@ -59,7 +59,7 @@ def test_ni_la_query_string_ni_el_cuerpo_llegan_al_log(cliente, caplog):
     with caplog.at_level(logging.INFO, logger="backend.peticiones"):
         cliente.post(
             "/auth/login?token=SECRETO-EN-URL",
-            json={"correo": "x@bee.com.co", "password": "CLAVE-EN-CUERPO"},
+            json={"correo": "x.prueba@beeconsultoria.com", "password": "CLAVE-EN-CUERPO"},
         )
     nuestros = [r for r in caplog.records if r.name == "backend.peticiones"]
     assert nuestros

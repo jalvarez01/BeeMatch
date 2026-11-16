@@ -11,7 +11,7 @@ BUENA = {
     "JWT_SECRET": "x" * 48,
     "ENCRYPTION_KEY": Fernet.generate_key().decode(),
     "USA_PGVECTOR": True,
-    "SUPERUSUARIO_CORREO": "diana@bee.com.co",
+    "SUPERUSUARIO_CORREO": "diana.prueba@beeconsultoria.com",
     "SUPERUSUARIO_PASSWORD": "una-clave-larga-123",
     "ALLOWED_ORIGINS": ["https://beematch.ejemplo.com"],
     "EMBEDDING_API_KEY": "sk-a",

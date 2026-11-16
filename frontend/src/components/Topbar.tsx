@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { leerSesion } from '../api/client'
 import type { Sesion } from '../types'
 import { IconUser } from './Icons'
@@ -17,6 +19,9 @@ export default function Topbar({ titulo }: { titulo: string }) {
     <header className="bm-topbar">
       <h2>{titulo}</h2>
       <div className="bm-user">
+        <Link to="/cambiar-password" className="bm-link">
+          Cambiar contraseña
+        </Link>
         <span>
           <b>{usuario?.nombre ?? '—'}</b> / {ETIQUETA_ROL[usuario?.rol ?? ''] ?? ''}
         </span>

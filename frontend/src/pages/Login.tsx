@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { iniciarSesion } from '../api/auth'
 import { IconEye } from '../components/Icons'
@@ -90,7 +90,7 @@ export default function Login() {
             <input
               id="correo"
               type="email"
-              placeholder="nombre@bee.com.co"
+              placeholder="nombre.apellido@beeconsultoria.com"
               value={correo}
               data-error={Boolean(error)}
               onChange={(e) => setCorreo(e.target.value)}
@@ -125,9 +125,9 @@ export default function Login() {
               {cargando ? 'Ingresando…' : 'Iniciar sesión'}
             </button>
             <p className="foot">
-              ¿Primera vez? <Link to="/registro">Crear cuenta</Link>
+              Acceso exclusivo para personal autorizado de BEE. Si aún no tienes cuenta, pídesela
+              a la superadministradora.
             </p>
-            <p className="foot">Acceso exclusivo para personal autorizado de BEE.</p>
           </form>
           <span className="copy">© 2026 BEE Consultoría y Negocios</span>
         </section>

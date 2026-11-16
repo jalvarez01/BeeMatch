@@ -9,6 +9,14 @@ from backend.infrastructure.persistence.normalizacion import limpiar_nombre, nor
 LIMITE_SUGERENCIAS = 8
 
 
+class ClienteDuplicadoError(ValueError):
+    """Ya hay un cliente con ese nombre (sin distinguir mayúsculas ni espacios)."""
+
+
+class ClienteEnUsoError(ValueError):
+    """El cliente tiene solicitudes: borrarlo dejaría el historial sin cliente."""
+
+
 def _escapar_like(texto: str) -> str:
     """Los comodines de LIKE escritos por la persona se buscan literalmente."""
     return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -28,6 +36,34 @@ class ClienteRepository:
             .filter(ClienteModel.nombre_normalizado == normalizar_nombre(nombre))
             .first()
         )
+
+    def registrar(self, nombre: str) -> ClienteModel:
+        """El catálogo lo administra la superadministradora: un nombre repetido se rechaza."""
+        if self.get_por_nombre(nombre):
+            raise ClienteDuplicadoError("Ya existe un cliente con ese nombre.")
+        return self.get_o_crear(nombre)
+
+    def renombrar(self, cliente: ClienteModel, nombre: str) -> ClienteModel:
+        otro = self.get_por_nombre(nombre)
+        if otro and otro.id != cliente.id:
+            raise ClienteDuplicadoError("Ya existe un cliente con ese nombre.")
+        cliente.nombre = limpiar_nombre(nombre)
+        cliente.nombre_normalizado = normalizar_nombre(nombre)
+        self.db.commit()
+        self.db.refresh(cliente)
+        return cliente
+
+    def eliminar(self, cliente: ClienteModel) -> None:
+        """Solo un cliente sin solicitudes: el historial siempre conserva el suyo."""
+        from backend.infrastructure.persistence.models.solicitud import SolicitudModel
+
+        if self.db.query(SolicitudModel).filter(SolicitudModel.cliente_id == cliente.id).first():
+            raise ClienteEnUsoError(
+                "Este cliente tiene solicitudes en el historial, así que no se puede borrar."
+            )
+        self.db.query(ProyectoModel).filter(ProyectoModel.cliente_id == cliente.id).delete()
+        self.db.delete(cliente)
+        self.db.commit()
 
     def get_o_crear(self, nombre: str, sector: Optional[str] = None) -> ClienteModel:
         """

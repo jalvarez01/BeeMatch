@@ -30,8 +30,8 @@ ROL = "Desarrollador Backend"
 
 @pytest.fixture
 def admin(crear_usuario, entrar):
-    crear_usuario("admin@bee.com.co", rol="ADMINISTRADOR", nombre="Admin Bee")
-    return entrar("admin@bee.com.co")
+    crear_usuario("admin.prueba@beeconsultoria.com", rol="ADMINISTRADOR", nombre="Admin Bee")
+    return entrar("admin.prueba@beeconsultoria.com")
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def test_hu06_criterio1_cada_evento_trae_fecha_hora_usuario_rol_y_accion(cliente
     assert momento.utcoffset() == timedelta(0)
     assert momento.time() is not None
     assert login["usuario_nombre"] == "Admin Bee"
-    assert login["usuario_correo"] == "admin@bee.com.co"
+    assert login["usuario_correo"] == "admin.prueba@beeconsultoria.com"
     assert login["rol"] == "ADMINISTRADOR"
 
 
@@ -86,7 +86,7 @@ def _eventos_en_base(db):
 
 
 def test_hu06_criterio1_un_evento_anterior_sin_rol_guardado_usa_el_rol_actual(db, crear_usuario):
-    usuario = crear_usuario("vieja@bee.com.co", rol="DIRECTOR")
+    usuario = crear_usuario("vieja.prueba@beeconsultoria.com", rol="DIRECTOR")
     db.add(RegistroBitacoraModel(usuario_id=usuario.id, accion="LOGIN"))
     db.commit()
 
@@ -123,15 +123,15 @@ def test_hu06_criterio1_la_lista_se_pagina_e_informa_el_total(cliente, admin, db
 
 
 def test_hu06_criterio2_filtra_por_usuario(cliente, admin, crear_usuario, entrar):
-    crear_usuario("ana@bee.com.co", rol="COORDINADOR", nombre="Ana")
-    entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com", rol="COORDINADOR", nombre="Ana")
+    entrar("ana.prueba@beeconsultoria.com")
     todos = _eventos(cliente, admin)["items"]
-    ana = next(e for e in todos if e["usuario_correo"] == "ana@bee.com.co")
+    ana = next(e for e in todos if e["usuario_correo"] == "ana.prueba@beeconsultoria.com")
 
     solo_ana = _eventos(cliente, admin, usuario_id=ana["usuario_id"])
 
     assert solo_ana["total"] == 1
-    assert {e["usuario_correo"] for e in solo_ana["items"]} == {"ana@bee.com.co"}
+    assert {e["usuario_correo"] for e in solo_ana["items"]} == {"ana.prueba@beeconsultoria.com"}
     assert solo_ana["total"] < len(todos)
 
 
@@ -168,7 +168,7 @@ def test_hu06_criterio2_la_fecha_final_incluye_todo_ese_dia(cliente, admin, db):
 
 
 def test_hu06_criterio2_se_combinan_usuario_y_fechas(cliente, admin, db, crear_usuario):
-    otro = crear_usuario("otro@bee.com.co", rol="DIRECTOR")
+    otro = crear_usuario("otro.prueba@beeconsultoria.com", rol="DIRECTOR")
     dia = datetime(2026, 4, 2, 9, 0, tzinfo=UTC)
     _fijar_fecha(db, BitacoraService(db).registrar("DEL_OTRO", usuario_id=otro.id).id, dia)
     _fijar_fecha(db, BitacoraService(db).registrar("SIN_USUARIO").id, dia)
@@ -201,7 +201,7 @@ def test_hu06_criterio2_una_fecha_mal_escrita_responde_422(cliente, admin):
 # --- Criterio 3: cada búsqueda queda registrada ------------------------------
 
 
-def _preparar_busqueda(cliente, crear_usuario, entrar, correo="ana@bee.com.co"):
+def _preparar_busqueda(cliente, crear_usuario, entrar, correo="ana.prueba@beeconsultoria.com"):
     usuario = crear_usuario(correo, rol="COORDINADOR", nombre="Ana")
     cabeceras = entrar(correo)
     solicitud = cliente.post(
@@ -280,8 +280,8 @@ def test_hu06_criterio3_el_segundo_clic_devuelve_la_busqueda_en_curso_y_deja_un_
 def test_hu06_criterio3_una_busqueda_rechazada_por_validacion_no_se_registra(
     cliente, crear_usuario, entrar, sin_worker, db
 ):
-    crear_usuario("ana@bee.com.co")
-    cabeceras = entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    cabeceras = entrar("ana.prueba@beeconsultoria.com")
     solicitud = cliente.post(
         "/solicitudes/",
         json={"descripcion_libre": DESCRIPCION, "cliente": "Bancolombia"},
@@ -326,8 +326,8 @@ def test_hu06_criterio3_la_solicitud_tambien_queda_en_la_bitacora(
 
 @pytest.mark.parametrize("rol", ["DIRECTOR", "COORDINADOR"])
 def test_hu06_criterio4_director_y_coordinador_reciben_403(cliente, crear_usuario, entrar, rol):
-    crear_usuario("otro@bee.com.co", rol=rol)
-    cabeceras = entrar("otro@bee.com.co")
+    crear_usuario("otro.prueba@beeconsultoria.com", rol=rol)
+    cabeceras = entrar("otro.prueba@beeconsultoria.com")
 
     respuesta = cliente.get(RUTA, headers=cabeceras)
 
@@ -343,6 +343,6 @@ def test_hu06_criterio4_el_administrador_si_entra(cliente, admin):
 
 
 def test_hu06_criterio4_la_superadministradora_tambien_entra(cliente, crear_usuario, entrar):
-    crear_usuario("diana@bee.com.co", rol="SUPERADMINISTRADOR")
+    crear_usuario("diana.prueba@beeconsultoria.com", rol="SUPERADMINISTRADOR")
 
-    assert cliente.get(RUTA, headers=entrar("diana@bee.com.co")).status_code == 200
+    assert cliente.get(RUTA, headers=entrar("diana.prueba@beeconsultoria.com")).status_code == 200
