@@ -272,7 +272,10 @@ def test_hu15_criterio2_el_ajuste_reemplaza_por_completo_lo_que_se_quita_se_borr
     assert guardada["cliente_nombre"] == "Bancolombia"
 
 
-def test_hu15_criterio2_cliente_y_proyecto_tambien_se_pueden_ajustar(cliente, cabeceras, despachos, db):
+def test_hu15_criterio2_cliente_y_proyecto_tambien_se_pueden_ajustar(
+    cliente, cabeceras, despachos, db, registrar_cliente
+):
+    registrar_cliente("Davivienda")
     solicitud = _solicitud(cliente, cabeceras)
 
     nueva = _reejecutar(
@@ -333,8 +336,9 @@ def test_hu15_criterio2_el_listado_se_actualiza_con_los_candidatos_de_la_nueva_e
 
 
 def test_hu15_criterio3_la_ejecucion_anterior_conserva_sus_criterios_cliente_y_proyecto(
-    cliente, cabeceras, despachos, db
+    cliente, cabeceras, despachos, db, registrar_cliente
 ):
+    registrar_cliente("Davivienda")
     solicitud = _solicitud(cliente, cabeceras)
     primera = _ejecutar(cliente, cabeceras, solicitud["id"])
     _terminar(db, primera)

@@ -18,6 +18,11 @@ from scripts import migrar_sqlite_a_postgres as migracion
 pytestmark = pytest.mark.skipif(not USA_PGVECTOR, reason="Requiere PostgreSQL con pgvector")
 
 
+@pytest.fixture(autouse=True)
+def cliente_del_catalogo():
+    """Sustituye al de conftest: la migración exige un destino sin datos."""
+
+
 @pytest.fixture
 def origen(tmp_path):
     ruta = tmp_path / "origen.db"

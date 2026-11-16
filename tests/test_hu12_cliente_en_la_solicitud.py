@@ -55,9 +55,27 @@ def sin_worker(monkeypatch):
     return despachos
 
 
+@pytest.fixture(autouse=True)
+def cliente_del_catalogo():
+    """Sustituye al de conftest: aquí cada prueba registra los clientes que necesita."""
+
+
+def _registrar(nombre: str) -> None:
+    """El catálogo lo administra la superadministradora; estas pruebas lo llenan directo."""
+    with database.SessionLocal() as sesion:
+        ClienteRepository(sesion).get_o_crear(nombre)
+
+
+def _esta_registrado(nombre: str) -> bool:
+    with database.SessionLocal() as sesion:
+        return ClienteRepository(sesion).get_por_nombre(nombre) is not None
+
+
 def _solicitud(http, cabeceras, /, **datos) -> dict:
     """`http` es solo posicional: así `cliente=` llega a los datos y no choca con la fixture."""
     cuerpo = {"descripcion_libre": DESCRIPCION, "rol_buscado": ROL, "cliente": "Bancolombia", **datos}
+    if (cuerpo["cliente"] or "").strip() and not _esta_registrado(cuerpo["cliente"]):
+        _registrar(cuerpo["cliente"])
     respuesta = http.post("/solicitudes/", json=cuerpo, headers=cabeceras)
     assert respuesta.status_code == 201, respuesta.text
     return respuesta.json()
@@ -143,6 +161,7 @@ def test_hu12_criterio1_al_completar_el_cliente_la_solicitud_se_ejecuta(
     db.add(anterior)
     db.commit()
     assert cliente.post(f"/busquedas/solicitud/{anterior.id}", headers=cabeceras).status_code == 422
+    _registrar("Bancolombia")
 
     completada = cliente.put(
         f"/solicitudes/{anterior.id}", json={"cliente": "Bancolombia"}, headers=cabeceras
@@ -240,7 +259,7 @@ def test_hu12_criterio3_las_variantes_de_un_cliente_no_crean_otro_registro(
 ):
     primera = _solicitud(cliente, cabeceras, cliente="Acme S.A.S.")
 
-    segunda = _solicitud(cliente, cabeceras, cliente=variante)
+    segunda = _solicitud(cliente, cabeceras, cliente=variante)  # no se registra de nuevo
 
     assert segunda["cliente_id"] == primera["cliente_id"]
     assert segunda["cliente_nombre"] == "Acme S.A.S."
@@ -366,6 +385,7 @@ def test_hu12_criterio4_al_cambiar_de_cliente_se_descarta_el_proyecto_del_client
     cliente, cabeceras
 ):
     solicitud = _solicitud(cliente, cabeceras, cliente="Bancolombia", proyecto="Core Bancario")
+    _registrar("Davivienda")  # el cambio de cliente exige uno ya registrado
 
     editada = cliente.put(
         f"/solicitudes/{solicitud['id']}", json={"cliente": "Davivienda"}, headers=cabeceras
@@ -551,3 +571,56 @@ def test_hu12_criterio6_las_columnas_nuevas_se_agregan_a_una_base_existente(db):
     columnas_busquedas = {c["name"] for c in inspect(database.engine).get_columns("busquedas")}
     assert "nombre_normalizado" in columnas_clientes
     assert "parametros_json" in columnas_busquedas
+
+
+# --- Criterio 7: el cliente debe estar registrado por la superadministradora ----
+
+
+def test_hu12_criterio7_un_cliente_que_no_esta_registrado_se_rechaza(cliente, cabeceras, db):
+    cuerpo = {"descripcion_libre": DESCRIPCION, "rol_buscado": ROL, "cliente": "Cliente Inventado"}
+
+    respuesta = cliente.post("/solicitudes/", json=cuerpo, headers=cabeceras)
+
+    assert respuesta.status_code == 422
+    assert "no está registrado" in respuesta.json()["detail"]
+    assert db.query(SolicitudModel).count() == 0
+    assert db.query(ClienteModel).count() == 0
+
+
+def test_hu12_criterio7_al_editar_tampoco_se_puede_cambiar_a_un_cliente_no_registrado(
+    cliente, cabeceras, db
+):
+    solicitud = _solicitud(cliente, cabeceras)
+
+    respuesta = cliente.put(
+        f"/solicitudes/{solicitud['id']}", json={"cliente": "Cliente Inventado"}, headers=cabeceras
+    )
+
+    assert respuesta.status_code == 422
+    assert db.query(ClienteModel).count() == 1
+
+
+def test_hu12_criterio7_ajustar_a_un_cliente_no_registrado_se_rechaza(cliente, cabeceras, db):
+    solicitud = _solicitud(cliente, cabeceras)
+
+    respuesta = cliente.post(
+        f"/busquedas/solicitud/{solicitud['id']}/reejecutar",
+        json={
+            "descripcion_libre": DESCRIPCION,
+            "rol_buscado": ROL,
+            "cliente": "Cliente Inventado",
+            "criterios": [],
+        },
+        headers=cabeceras,
+    )
+
+    assert respuesta.status_code in (404, 422)
+    assert db.query(ClienteModel).count() == 1
+
+
+def test_hu12_criterio7_el_nombre_se_acepta_sin_importar_mayusculas_ni_espacios(cliente, cabeceras):
+    _registrar("Bancolombia")
+
+    solicitud = _solicitud(cliente, cabeceras, cliente="  BANCOLOMBIA ")
+
+    assert solicitud["cliente_nombre"] == "Bancolombia"

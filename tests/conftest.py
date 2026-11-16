@@ -101,6 +101,35 @@ def administrador(db):
 
 
 @pytest.fixture
+def registrar_cliente(db):
+    """
+    Fábrica de clientes del catálogo. Las solicitudes solo aceptan clientes ya
+    registrados (los registra la superadministradora), así que una prueba que
+    envía `"cliente": "X"` primero debe registrar a X.
+    """
+    from backend.infrastructure.persistence.repositories.cliente_repo import ClienteRepository
+
+    def registrar(nombre):
+        return ClienteRepository(db).get_o_crear(nombre)
+
+    return registrar
+
+
+@pytest.fixture(autouse=True)
+def cliente_del_catalogo(base_limpia):
+    """
+    "Bancolombia", el cliente que casi todas las pruebas envían, ya está en el catálogo.
+
+    Usa su propia sesión y la cierra: dejar una abierta en PostgreSQL bloquearía las
+    pruebas que borran o alteran el esquema.
+    """
+    from backend.infrastructure.persistence.repositories.cliente_repo import ClienteRepository
+
+    with SessionLocal() as sesion:
+        ClienteRepository(sesion).get_o_crear("Bancolombia")
+
+
+@pytest.fixture
 def origen(monkeypatch):
     """
     Sustituye la fábrica de clientes por el cliente falso.

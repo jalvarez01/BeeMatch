@@ -28,6 +28,7 @@ const NAV_POR_ROL: Record<Rol, { ruta: string; etiqueta: string }[]> = {
     { ruta: '/nueva-busqueda', etiqueta: 'Nueva búsqueda' },
     { ruta: '/solicitudes', etiqueta: 'Solicitudes' },
     { ruta: '/usuarios', etiqueta: 'Usuarios' },
+    { ruta: '/clientes', etiqueta: 'Clientes' },
     { ruta: '/bitacora', etiqueta: 'Bitácora' },
     { ruta: '/candidatos', etiqueta: 'Candidatos' },
     { ruta: '/historial', etiqueta: 'Historial' },

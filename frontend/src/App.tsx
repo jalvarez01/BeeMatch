@@ -5,6 +5,7 @@ import Bitacora from './pages/Bitacora'
 import Candidato from './pages/Candidato'
 import CambiarPassword from './pages/CambiarPassword'
 import Candidatos from './pages/Candidatos'
+import Clientes from './pages/Clientes'
 import Configuracion from './pages/Configuracion'
 import Dashboard from './pages/Dashboard'
 import Historial from './pages/Historial'
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/nueva-busqueda" element={<NuevaBusqueda />} />
         <Route path="/solicitudes" element={<Solicitudes />} />
         <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/clientes" element={<Clientes />} />
         <Route path="/bitacora" element={<Bitacora />} />
         <Route path="/candidatos" element={<Candidatos />} />
         <Route path="/historial" element={<Historial />} />
