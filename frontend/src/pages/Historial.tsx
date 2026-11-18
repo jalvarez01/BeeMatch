@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ejecutarBusqueda } from '../api/busquedas'
+import { leerSesion } from '../api/client'
 import { listarClientes } from '../api/clientes'
 import { duplicarSolicitud, eliminarSolicitud, listarHistorial } from '../api/solicitudes'
 import { EstadoBadge } from '../components/Badges'
 import CriteriosSolicitud from '../components/CriteriosSolicitud'
 import { IconSearch } from '../components/Icons'
 import { formatearFecha } from '../lib/formato'
-import type { ClienteSugerido, EstadoSolicitud, Solicitud } from '../types'
+import type { ClienteSugerido, EstadoSolicitud, Sesion, Solicitud } from '../types'
 
 const FILTROS: { valor: EstadoSolicitud | ''; etiqueta: string }[] = [
   { valor: '', etiqueta: 'Todos' },
@@ -31,6 +32,13 @@ export default function Historial() {
   // HU-12: filtro por cliente. Vacío es "todos los clientes".
   const [clienteId, setClienteId] = useState('')
   const [clientes, setClientes] = useState<ClienteSugerido[]>([])
+  // HU-13: filtros por usuario y por rango de fechas. El Coordinador solo ve lo suyo, así
+  // que no se le ofrece el filtro por usuario.
+  const [usuario, setUsuario] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const veSoloLoSuyo = leerSesion<Sesion>()?.usuario?.rol === 'COORDINADOR'
+  const rangoInvalido = Boolean(fechaDesde && fechaHasta && fechaDesde > fechaHasta)
   const [pagina, setPagina] = useState(1)
   const [error, setError] = useState('')
   // HU-22: id de la solicitud que se está reintentando; bloquea otro clic mientras tanto.
@@ -38,11 +46,16 @@ export default function Historial() {
 
   const cargar = useCallback(async () => {
     setError('')
+    // Con el rango al revés no se consulta: se avisa debajo de los campos de fecha.
+    if (rangoInvalido) return
     try {
       const respuesta = await listarHistorial({
         estado: filtro || undefined,
         texto: texto || undefined,
         clienteId: clienteId || undefined,
+        usuario: usuario || undefined,
+        fechaDesde: fechaDesde || undefined,
+        fechaHasta: fechaHasta || undefined,
         pagina,
       })
       setSolicitudes(respuesta.solicitudes)
@@ -50,7 +63,7 @@ export default function Historial() {
     } catch (e) {
       setError((e as Error).message)
     }
-  }, [filtro, texto, clienteId, pagina])
+  }, [filtro, texto, clienteId, usuario, fechaDesde, fechaHasta, rangoInvalido, pagina])
 
   useEffect(() => {
     void cargar()
@@ -139,6 +152,51 @@ export default function Historial() {
             </option>
           ))}
         </select>
+        {!veSoloLoSuyo && (
+          <>
+            <label htmlFor="filtro-usuario" style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Usuario
+            </label>
+            <input
+              id="filtro-usuario"
+              placeholder="Nombre"
+              value={usuario}
+              onChange={(e) => {
+                setUsuario(e.target.value)
+                setPagina(1)
+              }}
+              style={{ fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line)' }}
+            />
+          </>
+        )}
+        <label htmlFor="filtro-desde" style={{ fontSize: 12, color: 'var(--muted)' }}>
+          Desde
+        </label>
+        <input
+          id="filtro-desde"
+          type="date"
+          value={fechaDesde}
+          max={fechaHasta || undefined}
+          onChange={(e) => {
+            setFechaDesde(e.target.value)
+            setPagina(1)
+          }}
+          style={{ fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line)' }}
+        />
+        <label htmlFor="filtro-hasta" style={{ fontSize: 12, color: 'var(--muted)' }}>
+          Hasta
+        </label>
+        <input
+          id="filtro-hasta"
+          type="date"
+          value={fechaHasta}
+          min={fechaDesde || undefined}
+          onChange={(e) => {
+            setFechaHasta(e.target.value)
+            setPagina(1)
+          }}
+          style={{ fontSize: 12, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line)' }}
+        />
         {FILTROS.map((f) => (
           <button
             key={f.etiqueta}
@@ -152,6 +210,12 @@ export default function Historial() {
           </button>
         ))}
       </div>
+
+      {rangoInvalido && (
+        <div className="bm-alert bm-alert-error" role="alert">
+          La fecha inicial no puede ser posterior a la fecha final.
+        </div>
+      )}
 
       <div className="bm-card">
         <div className="bm-row-between" style={{ marginBottom: 6 }}>

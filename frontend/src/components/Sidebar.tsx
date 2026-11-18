@@ -8,6 +8,7 @@ const NAV_POR_ROL: Record<Rol, { ruta: string; etiqueta: string }[]> = {
   COORDINADOR: [
     { ruta: '/nueva-busqueda', etiqueta: 'Nueva búsqueda' },
     { ruta: '/candidatos', etiqueta: 'Candidatos' },
+    { ruta: '/historial', etiqueta: 'Historial' },
   ],
   DIRECTOR: [
     { ruta: '/nueva-busqueda', etiqueta: 'Nueva búsqueda' },
