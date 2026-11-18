@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -18,6 +19,7 @@ from backend.schemas.solicitud import (
 )
 from backend.security import (
     ROL_ADMINISTRADOR,
+    ROL_COORDINADOR,
     ROL_DIRECTOR,
     exigir_rol,
     get_current_user,
@@ -70,13 +72,37 @@ def historial(
     estado: Optional[str] = None,
     texto: Optional[str] = None,
     cliente_id: Optional[str] = None,
+    usuario: Optional[str] = Query(default=None, max_length=160),
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=10, ge=1, le=50),
     svc: SolicitudService = Depends(_service),
-    _=Depends(exigir_rol(ROL_DIRECTOR, ROL_ADMINISTRADOR)),
+    current_user=Depends(exigir_rol(ROL_COORDINADOR, ROL_DIRECTOR, ROL_ADMINISTRADOR)),
 ):
-    """HU-13: historial filtrable. HU-12: también por cliente (`cliente_id`)."""
-    solicitudes, total = svc.historial(estado, texto, pagina, por_pagina, cliente_id)
+    """
+    HU-13: historial filtrable por estado, texto, fecha, cliente (HU-12) y usuario.
+
+    El Coordinador solo ve lo que él mismo registró; el Director y los administradores
+    ven todo el área. A un Coordinador se le ignora el filtro por usuario: no puede
+    usarlo para ver lo de otra persona.
+    """
+    if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
+        raise HTTPException(
+            status_code=422, detail="La fecha inicial no puede ser posterior a la fecha final."
+        )
+    propias = current_user.rol == ROL_COORDINADOR
+    solicitudes, total = svc.historial(
+        estado,
+        texto,
+        pagina,
+        por_pagina,
+        cliente_id,
+        usuario=None if propias else usuario,
+        usuario_id=current_user.id if propias else None,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
     return HistorialResponse(total=total, pagina=pagina, solicitudes=solicitudes)
 
 

@@ -220,16 +220,21 @@ class SolicitudService:
         pagina: int = 1,
         por_pagina: int = 10,
         cliente_id: Optional[str] = None,
+        **filtros,
     ) -> tuple[list[SolicitudResponse], int]:
-        """HU-13: historial filtrable y paginado. HU-12: también por cliente."""
+        """
+        HU-13: historial filtrable y paginado, por estado, texto, fecha, cliente (HU-12) y
+        usuario. `filtros` admite `usuario`, `usuario_id`, `fecha_desde` y `fecha_hasta`.
+        """
         solicitudes = self.repo.listar(
             estado=estado,
             texto=texto,
             limite=por_pagina,
             desplazamiento=(pagina - 1) * por_pagina,
             cliente_id=cliente_id,
+            **filtros,
         )
-        total = self.repo.contar(estado=estado, texto=texto, cliente_id=cliente_id)
+        total = self.repo.contar(estado=estado, texto=texto, cliente_id=cliente_id, **filtros)
         return [self._enriquecer(s) for s in solicitudes], total
 
     # --- Internos ------------------------------------------------------------

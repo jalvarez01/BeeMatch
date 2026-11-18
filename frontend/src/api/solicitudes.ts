@@ -34,12 +34,18 @@ export async function listarHistorial(params: {
   estado?: string
   texto?: string
   clienteId?: string
+  usuario?: string
+  fechaDesde?: string
+  fechaHasta?: string
   pagina?: number
 }): Promise<Historial> {
   const query = new URLSearchParams()
   if (params.estado) query.set('estado', params.estado)
   if (params.texto) query.set('texto', params.texto)
   if (params.clienteId) query.set('cliente_id', params.clienteId)
+  if (params.usuario) query.set('usuario', params.usuario)
+  if (params.fechaDesde) query.set('fecha_desde', params.fechaDesde)
+  if (params.fechaHasta) query.set('fecha_hasta', params.fechaHasta)
   query.set('pagina', String(params.pagina ?? 1))
   return apiFetch<Historial>(`/solicitudes/?${query.toString()}`)
 }
