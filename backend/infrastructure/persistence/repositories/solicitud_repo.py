@@ -1,3 +1,4 @@
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Optional
 
 from sqlalchemy import or_, select
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Query, Session
 from backend.infrastructure.persistence.models.busqueda import BusquedaModel
 from backend.infrastructure.persistence.models.cliente import ClienteModel, ProyectoModel
 from backend.infrastructure.persistence.models.solicitud import CriterioModel, SolicitudModel
+from backend.infrastructure.persistence.models.usuario import UsuarioModel
 
 
 class SolicitudRepository:
@@ -89,12 +91,40 @@ class SolicitudRepository:
         estado: Optional[str] = None,
         texto: Optional[str] = None,
         cliente_id: Optional[str] = None,
+        usuario: Optional[str] = None,
+        usuario_id: Optional[str] = None,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
     ) -> Query:
         consulta = self.db.query(SolicitudModel)
         if estado:
             consulta = consulta.filter(SolicitudModel.estado == estado)
         if cliente_id:
             consulta = consulta.filter(SolicitudModel.cliente_id == cliente_id)
+        if usuario_id:
+            # HU-13: el Coordinador solo ve lo que él mismo registró.
+            consulta = consulta.filter(SolicitudModel.usuario_id == usuario_id)
+        if usuario and usuario.strip():
+            # HU-13: por el nombre de quien la registró. Se busca también en el nombre
+            # guardado en la solicitud, para encontrar a quien ya no tiene cuenta.
+            patron = f"%{usuario.strip().lower()}%"
+            ids_usuario = select(UsuarioModel.id).where(UsuarioModel.nombre.ilike(patron))
+            consulta = consulta.filter(
+                or_(
+                    SolicitudModel.autor_nombre.ilike(patron),
+                    SolicitudModel.usuario_id.in_(ids_usuario),
+                )
+            )
+        # HU-13: rango de fechas, inclusivo en ambos extremos y en UTC.
+        if fecha_desde:
+            consulta = consulta.filter(
+                SolicitudModel.created_at >= datetime.combine(fecha_desde, time.min, tzinfo=UTC)
+            )
+        if fecha_hasta:
+            consulta = consulta.filter(
+                SolicitudModel.created_at
+                < datetime.combine(fecha_hasta + timedelta(days=1), time.min, tzinfo=UTC)
+            )
         if texto:
             # HU-12: el texto busca por rol, cliente o proyecto, como promete el buscador.
             patron = f"%{texto.strip().lower()}%"
@@ -116,9 +146,10 @@ class SolicitudRepository:
         limite: int = 20,
         desplazamiento: int = 0,
         cliente_id: Optional[str] = None,
+        **filtros,
     ) -> list[SolicitudModel]:
         return (
-            self._filtrada(estado, texto, cliente_id)
+            self._filtrada(estado, texto, cliente_id, **filtros)
             .order_by(SolicitudModel.created_at.desc())
             .offset(desplazamiento)
             .limit(limite)
@@ -130,8 +161,9 @@ class SolicitudRepository:
         estado: Optional[str] = None,
         texto: Optional[str] = None,
         cliente_id: Optional[str] = None,
+        **filtros,
     ) -> int:
-        return self._filtrada(estado, texto, cliente_id).count()
+        return self._filtrada(estado, texto, cliente_id, **filtros).count()
 
     # --- Criterios -----------------------------------------------------------
 

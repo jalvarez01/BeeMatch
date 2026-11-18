@@ -66,7 +66,7 @@ def test_consultar_sesion_no_modifica_el_rol_guardado(db, administrador):
     db.refresh(administrador)
     assert administrador.rol == "COORDINADOR"
 
-def test_coordinador_no_puede_consultar_historial_completo(db, administrador):
+def test_coordinador_solo_consulta_su_propio_historial(db, administrador):
     from fastapi.testclient import TestClient
 
     from backend.infrastructure.persistence.database import get_db
@@ -88,7 +88,9 @@ def test_coordinador_no_puede_consultar_historial_completo(db, administrador):
     try:
         with TestClient(app) as cliente:
             respuesta = cliente.get("/solicitudes/")
-        assert respuesta.status_code == 403
+        # HU-13: puede abrirlo, pero solo ve lo que él registró (ver test_hu13_historial.py).
+        assert respuesta.status_code == 200
+        assert respuesta.json()["total"] == 0
     finally:
         app.dependency_overrides.clear()
 
