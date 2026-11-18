@@ -5,6 +5,7 @@ import { leerSesion } from '../api/client'
 import {
   actualizarUsuario,
   crearUsuario,
+  eliminarUsuario,
   listarUsuarios,
 } from '../api/usuarios'
 import type { CambiosUsuario, CrearUsuarioPayload } from '../api/usuarios'
@@ -30,7 +31,7 @@ const FORMULARIO_VACIO: CrearUsuarioPayload = {
   rol: 'COORDINADOR',
 }
 
-/** HU-03: creación, edición, aprobación e inactivación de usuarios. */
+/** HU-03: la superadministradora crea las cuentas; aquí se editan, inactivan y borran. */
 export default function Usuarios() {
   const actor = leerSesion<Sesion>()?.usuario
   const gestionables = (actor && ROLES_QUE_GESTIONA[actor.rol]) ?? []
@@ -122,8 +123,13 @@ export default function Usuarios() {
     }, 'Datos actualizados correctamente.')
   }
 
-  const pendientes = usuarios.filter((usuario) => usuario.pendiente)
-  const resto = usuarios.filter((usuario) => !usuario.pendiente)
+  const borrar = (usuario: Usuario) => {
+    const confirmado = window.confirm(
+      `¿Borrar el perfil de ${usuario.nombre}? Su historial de solicitudes se conserva, ` +
+        'pero ya no podrá entrar. Para suspender el acceso sin borrarla, inactívala.',
+    )
+    if (confirmado) void ejecutar(() => eliminarUsuario(usuario.id), 'Perfil borrado.')
+  }
 
   const fila = (usuario: Usuario) => (
     <div className="bm-user-row" key={usuario.id}>
@@ -142,8 +148,8 @@ export default function Usuarios() {
             <input
               aria-label="Correo"
               type="email"
-              pattern="^[^@\s]+@bee\.com\.co$"
-              title="Solo se permiten correos con dominio @bee.com.co"
+              pattern="^[A-Za-z0-9]+\.[A-Za-z0-9]+@beeconsultoria\.com$"
+              title="El correo debe tener la forma nombre.apellido@beeconsultoria.com"
               value={editando.correo}
               onChange={(e) =>
                 setEditando({ ...editando, correo: e.target.value })
@@ -194,20 +200,8 @@ export default function Usuarios() {
         )}
       </div>
 
-      <span
-        className={`bm-badge ${
-          usuario.pendiente
-            ? 'bm-badge-yellow'
-            : usuario.activo
-              ? 'bm-badge-green'
-              : 'bm-badge-gray'
-        }`}
-      >
-        {usuario.pendiente
-          ? 'Pendiente'
-          : usuario.activo
-            ? 'Activo'
-            : 'Inactivo'}
+      <span className={`bm-badge ${usuario.activo ? 'bm-badge-green' : 'bm-badge-gray'}`}>
+        {usuario.activo ? 'Activo' : 'Inactivo'}
       </span>
 
       <div className="bm-user-acciones">
@@ -245,36 +239,7 @@ export default function Usuarios() {
                 Editar
               </button>
 
-              {usuario.pendiente ? (
-                <>
-                  <button
-                    className="bm-btn bm-btn-primary"
-                    disabled={guardando}
-                    onClick={() =>
-                      void cambiar(
-                        usuario,
-                        { activo: true },
-                        'Cuenta aprobada.',
-                      )
-                    }
-                  >
-                    Aprobar
-                  </button>
-                  <button
-                    className="bm-btn bm-btn-ghost"
-                    disabled={guardando}
-                    onClick={() =>
-                      void cambiar(
-                        usuario,
-                        { activo: false },
-                        'Solicitud rechazada.',
-                      )
-                    }
-                  >
-                    Rechazar
-                  </button>
-                </>
-              ) : usuario.activo ? (
+              {usuario.activo ? (
                 <button
                   className="bm-btn bm-btn-ghost"
                   disabled={guardando}
@@ -303,6 +268,16 @@ export default function Usuarios() {
                   Reactivar
                 </button>
               )}
+
+              {usuario.id !== actor.id && (
+                <button
+                  className="bm-btn bm-btn-ghost"
+                  disabled={guardando}
+                  onClick={() => borrar(usuario)}
+                >
+                  Borrar
+                </button>
+              )}
             </>
           ))}
       </div>
@@ -313,8 +288,9 @@ export default function Usuarios() {
     <>
       <h1 className="bm-h1">Gestión de usuarios</h1>
       <p className="bm-sub">
-        Crea, edita e inactiva cuentas. Al inactivar se impide el acceso,
-        pero se conserva el historial.
+        Aquí se crean las cuentas: nadie se registra por su cuenta. Cada persona cambia su
+        contraseña al entrar y tú no puedes verla. Al inactivar se impide el acceso; al borrar
+        se elimina el perfil y se conserva el historial de sus solicitudes.
       </p>
 
       {error && (
@@ -351,9 +327,9 @@ export default function Usuarios() {
             <input
               id="nu-correo"
               type="email"
-              pattern="^[^@\s]+@bee\.com\.co$"
-              title="Solo se permiten correos con dominio @bee.com.co"
-              placeholder="nombre@bee.com.co"
+              pattern="^[A-Za-z0-9]+\.[A-Za-z0-9]+@beeconsultoria\.com$"
+              title="El correo debe tener la forma nombre.apellido@beeconsultoria.com"
+              placeholder="nombre.apellido@beeconsultoria.com"
               value={formulario.correo}
               onChange={(e) =>
                 setFormulario({ ...formulario, correo: e.target.value })
@@ -409,15 +385,6 @@ export default function Usuarios() {
         </button>
       </form>
 
-      {pendientes.length > 0 && (
-        <section className="bm-card">
-          <h2 className="bm-h2">
-            Solicitudes de acceso ({pendientes.length})
-          </h2>
-          {pendientes.map(fila)}
-        </section>
-      )}
-
       <section className="bm-card">
         <div className="bm-row-between">
           <h2 className="bm-h2">Usuarios registrados</h2>
@@ -433,10 +400,10 @@ export default function Usuarios() {
 
         {cargando ? (
           <p>Cargando usuarios…</p>
-        ) : resto.length === 0 ? (
+        ) : usuarios.length === 0 ? (
           <p>No hay usuarios registrados.</p>
         ) : (
-          resto.map(fila)
+          usuarios.map(fila)
         )}
       </section>
     </>

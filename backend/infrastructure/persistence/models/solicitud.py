@@ -29,7 +29,12 @@ class SolicitudModel(Base):
 
     cliente_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("clientes.id"), nullable=True)
     proyecto_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("proyectos.id"), nullable=True)
-    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("usuarios.id"))
+    # Quién la hizo. Si la cuenta se borra, `usuario_id` queda vacío pero el nombre
+    # del autor se conserva para que el historial siga diciendo quién la creó.
+    usuario_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("usuarios.id"), nullable=True
+    )
+    autor_nombre: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

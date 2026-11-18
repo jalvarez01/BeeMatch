@@ -39,9 +39,7 @@ CLIENTE = "Bancolombia"
 @pytest.fixture
 def con_cliente(db, busqueda):
     """La solicitud de la búsqueda con rol y cliente, como llega de una solicitud real."""
-    cliente = ClienteModel(nombre=CLIENTE)
-    db.add(cliente)
-    db.flush()
+    cliente = db.query(ClienteModel).filter_by(nombre=CLIENTE).one()  # lo deja la fixture global
     solicitud = db.get(SolicitudModel, busqueda["solicitud_id"])
     solicitud.rol_buscado = ROL
     solicitud.cliente_id = cliente.id
@@ -184,9 +182,10 @@ def test_el_archivo_no_queda_guardado_en_el_servidor(cliente, cabeceras, busqued
 
 
 def test_exportar_una_ejecucion_anterior_usa_los_criterios_con_los_que_corrio(
-    db, cliente, cabeceras, con_cliente
+    db, cliente, cabeceras, con_cliente, registrar_cliente
 ):
     """HU-15: ajustar la solicitud después no cambia el encabezado del archivo de una ejecución anterior."""
+    registrar_cliente("Cliente Nuevo")
     SolicitudService(db).reemplazar(
         con_cliente["solicitud_id"],
         AjusteSolicitud(

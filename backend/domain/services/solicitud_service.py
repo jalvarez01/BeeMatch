@@ -68,6 +68,16 @@ def campos_faltantes(descripcion: Optional[str], rol: Optional[str]) -> list[str
     return faltantes
 
 
+class ClienteNoRegistradoError(ValueError):
+    """El cliente indicado no está en el catálogo que administra la superadministradora."""
+
+
+MENSAJE_CLIENTE_NO_REGISTRADO = (
+    "Ese cliente no está registrado. Elige uno de la lista; si falta, pídele a la "
+    "superadministradora que lo registre."
+)
+
+
 def cliente_en_blanco(cliente: Optional[str]) -> bool:
     """HU-12: ¿falta el cliente? Un texto de solo espacios cuenta como vacío."""
     return not (cliente or "").strip()
@@ -114,9 +124,15 @@ class SolicitudService:
             cliente_id=cliente_id,
             proyecto_id=proyecto_id,
             usuario_id=usuario_id,
+            autor_nombre=self._nombre_de(usuario_id),
         )
         self.repo.reemplazar_criterios(solicitud.id, [c.model_dump() for c in datos.criterios])
         return self._enriquecer(solicitud)
+
+    def _nombre_de(self, usuario_id: str) -> Optional[str]:
+        """Nombre de quien crea la solicitud: queda guardado aunque su cuenta se borre."""
+        usuario = self.usuarios.get_by_id(usuario_id)
+        return usuario.nombre if usuario else None
 
     def actualizar(self, solicitud_id: str, datos: SolicitudUpdate) -> Optional[SolicitudResponse]:
         """
@@ -175,6 +191,7 @@ class SolicitudService:
             cliente_id=original.cliente_id,
             proyecto_id=original.proyecto_id,
             usuario_id=usuario_id,
+            autor_nombre=self._nombre_de(usuario_id),
         )
         criterios = [
             {"tipo": c.tipo, "valor": c.valor, "obligatorio": c.obligatorio, "peso": c.peso}
@@ -221,15 +238,22 @@ class SolicitudService:
         self, cliente: Optional[str], proyecto: Optional[str]
     ) -> tuple[Optional[str], Optional[str]]:
         """
-        HU-12: ids del cliente y del proyecto, registrándolos si no existen. Los
-        nombres que solo difieren en mayúsculas o espacios son el mismo registro.
+        HU-12: ids del cliente y del proyecto. El cliente debe estar registrado: solo la
+        superadministradora los crea y los demás eligen uno. El proyecto sí se registra
+        al vuelo. Los nombres que solo difieren en mayúsculas o espacios son el mismo.
         """
         if cliente_en_blanco(cliente):
             return None, None
-        registro = self.clientes.get_o_crear(cliente or "")
+        registro = self._cliente_registrado(cliente or "")
         if not (proyecto or "").strip():
             return registro.id, None
         return registro.id, self.proyectos.get_o_crear(proyecto or "", registro.id).id
+
+    def _cliente_registrado(self, nombre: str):
+        registro = self.clientes.get_por_nombre(nombre)
+        if registro is None:
+            raise ClienteNoRegistradoError(MENSAJE_CLIENTE_NO_REGISTRADO)
+        return registro
 
     def _actualizar_cliente(
         self, solicitud, cliente: Optional[str], proyecto: Optional[str]
@@ -244,7 +268,7 @@ class SolicitudService:
 
         cliente_id = solicitud.cliente_id
         if not cliente_en_blanco(cliente):
-            cliente_id = self.clientes.get_o_crear(cliente or "").id
+            cliente_id = self._cliente_registrado(cliente or "").id
 
         if proyecto is None:
             proyecto_id = solicitud.proyecto_id if cliente_id == solicitud.cliente_id else None
@@ -268,8 +292,10 @@ class SolicitudService:
             proyecto = self.proyectos.get_by_id(solicitud.proyecto_id)
             respuesta.proyecto_nombre = proyecto.nombre if proyecto else None
 
-        usuario = self.usuarios.get_by_id(solicitud.usuario_id)
-        respuesta.usuario_nombre = usuario.nombre if usuario else None
+        # Si la cuenta ya no existe, el historial conserva el nombre de su autor.
+        usuario = self.usuarios.get_by_id(solicitud.usuario_id) if solicitud.usuario_id else None
+        respuesta.usuario_nombre = usuario.nombre if usuario else solicitud.autor_nombre
+        respuesta.usuario_eliminado = usuario is None
 
         respuesta.total_ejecuciones = self.busquedas.contar_de_solicitud(solicitud.id)
 

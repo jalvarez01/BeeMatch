@@ -46,8 +46,8 @@ AJUSTADA = "Desarrollador Backend Python con FastAPI y experiencia en seguros."
 
 @pytest.fixture
 def cabeceras(crear_usuario, entrar):
-    crear_usuario("ana@bee.com.co")
-    return entrar("ana@bee.com.co")
+    crear_usuario("ana.prueba@beeconsultoria.com")
+    return entrar("ana.prueba@beeconsultoria.com")
 
 
 @pytest.fixture
@@ -272,7 +272,10 @@ def test_hu15_criterio2_el_ajuste_reemplaza_por_completo_lo_que_se_quita_se_borr
     assert guardada["cliente_nombre"] == "Bancolombia"
 
 
-def test_hu15_criterio2_cliente_y_proyecto_tambien_se_pueden_ajustar(cliente, cabeceras, despachos, db):
+def test_hu15_criterio2_cliente_y_proyecto_tambien_se_pueden_ajustar(
+    cliente, cabeceras, despachos, db, registrar_cliente
+):
+    registrar_cliente("Davivienda")
     solicitud = _solicitud(cliente, cabeceras)
 
     nueva = _reejecutar(
@@ -333,8 +336,9 @@ def test_hu15_criterio2_el_listado_se_actualiza_con_los_candidatos_de_la_nueva_e
 
 
 def test_hu15_criterio3_la_ejecucion_anterior_conserva_sus_criterios_cliente_y_proyecto(
-    cliente, cabeceras, despachos, db
+    cliente, cabeceras, despachos, db, registrar_cliente
 ):
+    registrar_cliente("Davivienda")
     solicitud = _solicitud(cliente, cabeceras)
     primera = _ejecutar(cliente, cabeceras, solicitud["id"])
     _terminar(db, primera)
@@ -434,9 +438,9 @@ def test_hu15_criterio3_el_historial_cuenta_las_ejecuciones_de_cada_solicitud(
     _terminar(db, _ejecutar(cliente, cabeceras, solicitud["id"]))
     _reejecutar(cliente, cabeceras, solicitud["id"], _ajuste(experiencia_min=2))
     otra = _solicitud(cliente, cabeceras, rol_buscado="QA")
-    crear_usuario("dario@bee.com.co", rol="DIRECTOR")
+    crear_usuario("dario.prueba@beeconsultoria.com", rol="DIRECTOR")
 
-    historial = cliente.get("/solicitudes/", headers=entrar("dario@bee.com.co")).json()
+    historial = cliente.get("/solicitudes/", headers=entrar("dario.prueba@beeconsultoria.com")).json()
 
     por_id = {s["id"]: s for s in historial["solicitudes"]}
     assert por_id[solicitud["id"]]["total_ejecuciones"] == 2
@@ -576,9 +580,10 @@ def test_hu15_criterio4_una_ejecucion_con_error_aparece_en_el_historial_con_enla
     solicitud = _solicitud(cliente, cabeceras)
     fallida = _ejecutar(cliente, cabeceras, solicitud["id"])
     _analizar(db, fallida, [], embeddings=EmbeddingsCaidos())
-    crear_usuario("dario@bee.com.co", rol="DIRECTOR")
+    crear_usuario("dario.prueba@beeconsultoria.com", rol="DIRECTOR")
 
-    fila = cliente.get("/solicitudes/", headers=entrar("dario@bee.com.co")).json()["solicitudes"][0]
+    cabeceras = entrar("dario.prueba@beeconsultoria.com")
+    fila = cliente.get("/solicitudes/", headers=cabeceras).json()["solicitudes"][0]
 
     assert fila["estado"] == ESTADO_ERROR
     assert fila["busqueda_id"] == fallida
@@ -694,8 +699,8 @@ def test_hu15_un_coordinador_no_ajusta_ni_consulta_las_ejecuciones_de_otro(
     cliente, cabeceras, crear_usuario, entrar, despachos, db
 ):
     solicitud = _solicitud(cliente, cabeceras)
-    crear_usuario("beto@bee.com.co")
-    ajeno = entrar("beto@bee.com.co")
+    crear_usuario("beto.prueba@beeconsultoria.com")
+    ajeno = entrar("beto.prueba@beeconsultoria.com")
 
     ajuste = _reejecutar(cliente, ajeno, solicitud["id"], _ajuste(descripcion_libre=AJUSTADA))
     listado = cliente.get(f"/busquedas/solicitud/{solicitud['id']}/ejecuciones", headers=ajeno)
@@ -711,8 +716,8 @@ def test_hu15_un_director_si_puede_ajustar_y_consultar_las_ejecuciones_del_area(
     cliente, cabeceras, crear_usuario, entrar, despachos
 ):
     solicitud = _solicitud(cliente, cabeceras)
-    crear_usuario("dario@bee.com.co", rol="DIRECTOR")
-    director = entrar("dario@bee.com.co")
+    crear_usuario("dario.prueba@beeconsultoria.com", rol="DIRECTOR")
+    director = entrar("dario.prueba@beeconsultoria.com")
 
     assert _reejecutar(cliente, director, solicitud["id"], _ajuste()).status_code == 202
     assert len(_ejecuciones(cliente, director, solicitud["id"])) == 1

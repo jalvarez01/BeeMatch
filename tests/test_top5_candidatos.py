@@ -112,7 +112,7 @@ def _crear_candidatos(db, cuantos: int, anios: int | None = 5) -> list[str]:
 
 def _crear_solicitud(db, experiencia_min: int | None = None) -> str:
     usuario = UsuarioModel(
-        nombre="Reclutador", correo="reclutador@bee.com.co", password_hash="x", rol="ANALISTA"
+        nombre="Reclutador", correo="reclutador.prueba@beeconsultoria.com", password_hash="x", rol="ANALISTA"
     )
     db.add(usuario)
     db.commit()

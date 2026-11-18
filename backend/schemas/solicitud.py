@@ -76,6 +76,8 @@ class SolicitudResponse(BaseModel):
     cliente_nombre: Optional[str] = None
     proyecto_nombre: Optional[str] = None
     usuario_nombre: Optional[str] = None
+    # La persona que la creó ya no tiene cuenta; el nombre se conserva igual.
+    usuario_eliminado: bool = False
     criterios: list[CriterioResponse] = []
     total_candidatos: Optional[int] = None
     mejor_afinidad: Optional[float] = None

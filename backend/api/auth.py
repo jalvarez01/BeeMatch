@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.config import DOMINIO_CORREO
-from backend.domain.services.bitacora_service import ACCION_LOGIN, ACCION_LOGOUT, BitacoraService
+from backend.domain.services.bitacora_service import (
+    ACCION_LOGIN,
+    ACCION_LOGOUT,
+    ACCION_USUARIO_ELIMINADO,
+    BitacoraService,
+)
 from backend.domain.services.bloqueo_login_service import BloqueoLoginService
 from backend.infrastructure.persistence.database import get_db
 from backend.infrastructure.persistence.models.usuario import UsuarioModel
@@ -11,7 +15,6 @@ from backend.schemas.auth import (
     CambiarPasswordRequest,
     LoginRequest,
     LoginResponse,
-    RegistroRequest,
     UsuarioCreate,
     UsuarioResponse,
     UsuarioUpdate,
@@ -108,33 +111,6 @@ def cerrar_sesion(db: Session = Depends(get_db), current_user=Depends(get_curren
     BitacoraService(db).registrar(ACCION_LOGOUT, usuario_id=current_user.id)
 
 
-@router.post("/registro", response_model=UsuarioResponse, status_code=201)
-def registrarse(datos: RegistroRequest, db: Session = Depends(get_db)):
-    """
-    HU-03: autorregistro. La cuenta nace inactiva y pendiente; no puede iniciar
-    sesión hasta que la superusuaria (o un administrador) la apruebe y le asigne
-    el rol definitivo. Mientras tanto queda como COORDINADOR, el de menor poder.
-    """
-    if not datos.correo.lower().endswith(f"@{DOMINIO_CORREO}"):
-        raise HTTPException(
-            status_code=422, detail=f"Usa tu correo corporativo (@{DOMINIO_CORREO})."
-        )
-
-    repo = UsuarioRepository(db)
-    if repo.get_by_correo(datos.correo):
-        raise HTTPException(status_code=409, detail="Ya existe un usuario con ese correo.")
-
-    validar_fortaleza(datos.password)
-    return repo.crear(
-        nombre=datos.nombre,
-        correo=datos.correo,
-        rol="COORDINADOR",
-        password_hash=hashear_password(datos.password),
-        activo=False,
-        pendiente=True,
-    )
-
-
 @router.get("/yo", response_model=UsuarioResponse)
 def usuario_actual(current_user=Depends(get_current_user)):
     return current_user
@@ -146,16 +122,27 @@ def cambiar_password(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Cambio de contraseña propio. Exige la actual para evitar el secuestro de sesión."""
-    if not verificar_password(datos.password_actual, current_user.password_hash):
+    """
+    Cambio de contraseña propio. Exige la actual para evitar el secuestro de sesión.
+
+    Solo se guarda el hash: ni la superadministradora, que crea la cuenta con una
+    clave inicial, puede leer la que la persona elige después.
+    """
+    repo = UsuarioRepository(db)
+    # `current_user` es una copia de la sesión; el cambio se guarda en la cuenta real.
+    usuario = repo.get_by_id(current_user.id)
+    if not verificar_password(datos.password_actual, usuario.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual no es correcta."
         )
+    if datos.password_actual == datos.password_nueva:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña nueva debe ser distinta de la actual.",
+        )
 
     validar_fortaleza(datos.password_nueva)
-    return UsuarioRepository(db).actualizar_password(
-        current_user, hashear_password(datos.password_nueva)
-    )
+    return repo.actualizar_password(usuario, hashear_password(datos.password_nueva))
 
 
 # --- Gestión de usuarios (HU-03, HU-04) -------------------------------------
@@ -279,3 +266,33 @@ def actualizar_usuario(
         cambios["pendiente"] = False
 
     return repo.actualizar(usuario, **cambios)
+
+
+@router.delete("/usuarios/{usuario_id}", status_code=204)
+def eliminar_usuario(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(exigir_rol(ROL_ADMINISTRADOR)),
+):
+    """
+    Borra el perfil de una persona. Su historial de solicitudes se conserva y sigue
+    mostrando quién las hizo: la solicitud guarda el nombre de su autor, así que no
+    depende de que la cuenta exista. Para suspender el acceso sin borrar, se inactiva.
+    """
+    repo = UsuarioRepository(db)
+    usuario = repo.get_by_id(usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if usuario.id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes borrar tu propia cuenta.")
+    _exigir_poder_sobre(current_user, usuario.rol)
+
+    detalle = f"{usuario.nombre} ({usuario.correo})"
+    repo.eliminar(usuario)
+    BitacoraService(db).registrar(
+        ACCION_USUARIO_ELIMINADO,
+        usuario_id=current_user.id,
+        entidad="usuario",
+        entidad_id=usuario_id,
+        detalle=detalle,
+    )

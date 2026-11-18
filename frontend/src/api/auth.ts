@@ -1,5 +1,5 @@
 import type { Sesion, Usuario } from '../types'
-import { apiFetch, borrarSesion, guardarSesion } from './client'
+import { apiFetch, borrarSesion, guardarSesion, leerSesion } from './client'
 
 export async function iniciarSesion(correo: string, password: string): Promise<Sesion> {
   const sesion = await apiFetch<Sesion>(
@@ -28,19 +28,20 @@ export async function renovarSesion(): Promise<void> {
   guardarSesion(sesion)
 }
 
-export interface DatosRegistro {
-  nombre: string
-  correo: string
-  password: string
+export interface DatosCambioPassword {
+  password_actual: string
+  password_nueva: string
 }
 
-/** HU-03: autorregistro. La cuenta queda pendiente de aprobación. */
-export async function registrarse(datos: DatosRegistro): Promise<Usuario> {
-  return apiFetch<Usuario>(
-    '/auth/registro',
-    { method: 'POST', body: JSON.stringify(datos) },
-    false,
-  )
+/** Cambio de contraseña propio. Quita la marca de "debe cambiarla" de la sesión guardada. */
+export async function cambiarPassword(datos: DatosCambioPassword): Promise<Usuario> {
+  const usuario = await apiFetch<Usuario>('/auth/cambiar-password', {
+    method: 'POST',
+    body: JSON.stringify(datos),
+  })
+  const sesion = leerSesion<Sesion>()
+  if (sesion) guardarSesion({ ...sesion, usuario: { ...sesion.usuario, ...usuario } })
+  return usuario
 }
 
 export async function usuarioActual(): Promise<Usuario> {

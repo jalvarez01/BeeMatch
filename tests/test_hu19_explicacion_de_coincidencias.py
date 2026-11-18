@@ -91,8 +91,8 @@ def test_hu19_criterio1_la_explicacion_del_modelo_llega_a_la_recomendacion():
 def test_hu19_criterio1_y_3_el_detalle_incluye_la_explicacion_y_lo_no_evidenciado(
     cliente, crear_usuario, entrar, db
 ):
-    usuario = crear_usuario("ana@bee.com.co")
-    cabeceras = entrar("ana@bee.com.co")
+    usuario = crear_usuario("ana.prueba@beeconsultoria.com")
+    cabeceras = entrar("ana.prueba@beeconsultoria.com")
     hoja = HojaDeVidaModel(id_documento="doc-1", nombre_archivo="cv.pdf", formato="PDF")
     db.add(hoja)
     db.commit()
